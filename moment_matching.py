@@ -51,6 +51,10 @@ def _multi_exponents(m, k):
         gen([], total, 0)
     return exps
 
+# compute the moment‐feature vector of a single point
+def _all_moments(w, exps):
+    return np.array([np.prod(w**e) for e in exps], dtype=float)
+
 
 def compress_moments(data, k, tol=1e-12):
     """
@@ -96,10 +100,6 @@ def compress_moments(data, k, tol=1e-12):
     lambda_ = np.full(d, 1.0/d)
     I = set(range(d))  # active support indices
 
-    # compute the moment‐feature vector of a single point
-    def _phi(x):
-        return np.array([np.prod(x**e) for e in exps], dtype=float)
-
     # iteratively peel off points until support ≤ D
     while len(I) > D:
         # take any D+1 active indices
@@ -108,7 +108,7 @@ def compress_moments(data, k, tol=1e-12):
         # build the D×(D+1) moment matrix A
         A = np.empty((D, D+1), dtype=float)
         for col, j in enumerate(subset):
-            A[:, col] = _phi(w[j])
+            A[:, col] = _all_moments(w[j], exps)
 
         alpha = null_space(A, rcond=1e-12)[:, 0]
         # ensure alpha has some positive entries; if not, flip its sign
@@ -210,6 +210,44 @@ def demo_2d(d=1000, k=2, seed=0, plot=False):
     
 
 
+def demo_3d(d=500, k=2, seed=0):
+    """
+    Demonstration of compress_moments on 3D data:
+      1. Generate `d` random points in R^3 (standard normal).
+      2. Compress to at most binom(3+k, k) atoms matching moments up to order k.
+      3. Plot original data (left) and compressed support (right) as 3D scatter plots,
+         using marker area ∝ weight c_j.
+    """
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    # Generate data
+    np.random.seed(seed)
+    data = np.random.randn(d, 3)
+
+    # Compress
+    c_, w_ = compress_moments(data, k)
+
+    # Compute tensors and calculate error
+    exps = _multi_exponents(3, k)
+    moment_original = sum(_all_moments(data[j,:], exps) for j in range(d))
+    moment_compressed = sum(c_[j]*_all_moments(w_[j,:], exps) for j in range(c_.size))
+    max_err = np.max(np.abs(moment_original - moment_compressed))
+
+    # Plotting
+    fig = plt.figure(figsize=(10, 5))
+    ax1 = fig.add_subplot(121, projection='3d')
+    ax1.scatter(data[:, 0], data[:, 1], data[:, 2], s=5, alpha=0.6)
+    ax1.set_title(f"Original 3D data ({d} points)")
+
+    ax2 = fig.add_subplot(122, projection='3d')
+    ax2.scatter(w_[:, 0], w_[:, 1], w_[:, 2], s=c_, alpha=0.6)
+    ax2.set_title(f"Compressed to {c_.size} atoms. k={k}, error={max_err:.1e}")
+
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     # run demo with default parameters
-    demo_2d(d=10000, k=8, plot=True)
+    # demo_2d(d=10000, k=8, plot=True)
+    demo_3d(d=5000, k=4, seed=42)
