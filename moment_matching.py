@@ -54,7 +54,7 @@ def _multi_exponents(m, k):
 # compute the moment‐feature vector of a single point
 def _all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
-
+    
 
 def compress_moments(data, k, tol=1e-12):
     """
@@ -250,4 +250,4 @@ def demo_3d(d=500, k=2, seed=0):
 if __name__ == "__main__":
     # run demo with default parameters
     # demo_2d(d=10000, k=8, plot=True)
-    demo_3d(d=5000, k=4, seed=42)
+    demo_3d(d=5000, k=3, seed=42)
