@@ -1,6 +1,29 @@
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
+# from scipy.sparse.linalg import LinearOperator, eigsh
+from scipy.linalg import null_space
+
+
+# def null_vector(A, tol=1e-12, maxiter=1000, operator=False):
+#     """
+#     A: sparse (D, D+1) matrix
+#     returns: dense array of length D+1
+#     """
+#     if operator:
+#         # build the linear operator for M = A^T A
+#         n = A.shape[1]
+#         def matvec(x):
+#             return A.T.dot(A.dot(x))
+#         M = LinearOperator((n, n), matvec, dtype=A.dtype)
+#     else:
+#         M = A.T @ A
+
+#     eigvals, eigvecs = eigsh(M, k=1, sigma=-1., tol=tol, maxiter=maxiter)
+#     if eigvals[0] > tol:
+#         raise RuntimeError('No null vector found')
+#     return eigvecs[:, 0]
+
 
 def _multi_exponents(m, k):
     """
@@ -64,16 +87,17 @@ def compress_moments(data, k, tol=1e-12):
 
     # trivial if already small
     if d <= D:
-        # just assign weight 1 to each (so sum c_j = d)
-        return [(1.0, w_i.copy()) for w_i in w]
+        # trivial case: exactly d atoms with weight 1 each
+        c_ = np.ones(d, dtype=float)
+        w_ = w.copy()
+        return c_, w_
 
     # initial uniform weights lambda_i summing to 1
-    lam = np.full(d, 1.0/d)
+    lambda_ = np.full(d, 1.0/d)
     I = set(range(d))  # active support indices
 
-    # helper: compute the moment‐feature vector of a single point
+    # compute the moment‐feature vector of a single point
     def _phi(x):
-        # x: shape (m,)
         return np.array([np.prod(x**e) for e in exps], dtype=float)
 
     # iteratively peel off points until support ≤ D
@@ -86,32 +110,30 @@ def compress_moments(data, k, tol=1e-12):
         for col, j in enumerate(subset):
             A[:, col] = _phi(w[j])
 
-        # find a nontrivial null‐vector α (smallest right singular vector)
-        _, _, vh = np.linalg.svd(A, full_matrices=False)
-        alpha = vh[-1]   # length D+1
+        alpha = null_space(A, rcond=1e-12)[:, 0]
         # ensure alpha has some positive entries; if not, flip its sign
         if not np.any(alpha > 0):
             alpha = -alpha
 
         # find the largest step t so lam[j] - t*α_j ≥ 0 for all j
         # (at least one will hit zero)
-        t = min((lam[j]/αj) for αj, j in zip(alpha, subset) if αj > 0)
+        t = min((lambda_[j]/aj) for aj, j in zip(alpha, subset) if aj > 0)
 
         # move weights and drop zeros
-        for αj, j in zip(alpha, subset):
-            lam[j] -= t * αj
-            if lam[j] <= tol:
-                lam[j] = 0.0
+        for aj, j in zip(alpha, subset):
+            lambda_[j] -= t * aj
+            if lambda_[j] <= tol:
+                lambda_[j] = 0.0
                 I.remove(j)
 
     # build final arrays of weights and support points
-    idx = [j for j in sorted(I) if lam[j] > tol]
-    c_ = np.array([lam[j] * d for j in idx], dtype=float)
+    idx = [j for j in sorted(I) if lambda_[j] > tol]
+    c_ = np.array([lambda_[j] * d for j in idx], dtype=float)
     w_ = w[idx, :].copy()
     return c_, w_
 
 
-def demo_2d(d=1000, k=2, seed=0):
+def demo_2d(d=1000, k=2, seed=0, plot=False):
     """
     Demonstration of compress_moments_nd on 2D data:
       1. Generate `d` random points in R^2 (standard normal).
@@ -162,31 +184,32 @@ def demo_2d(d=1000, k=2, seed=0):
     print("Max tensor-moment error:", max_err)
 
     # Step 4: plotting
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-    ax1.scatter(data[:, 0], data[:, 1], s=5, alpha=0.6)
-    ax1.set_title("Original data ({} points)".format(d))
+    if plot:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        ax1.scatter(data[:, 0], data[:, 1], s=5, alpha=0.6)
+        ax1.set_title("Original data ({} points)".format(d))
 
-    coords = w_
-    weights = c_
-    # marker area `s` equal to weight so radius ∝ sqrt(c_j)
-    ax2.scatter(coords[:, 0], coords[:, 1], s=weights, alpha=0.6)
-    ax2.set_title(f"Compressed support ({c_.size} atoms)")
+        coords = w_
+        weights = c_
+        # marker area `s` equal to weight so radius ∝ sqrt(c_j)
+        ax2.scatter(coords[:, 0], coords[:, 1], s=weights, alpha=0.6)
+        ax2.set_title(f"Compressed to {c_.size} atoms, moment error = {max_err:.1e}")
 
-    # enforce same axis ranges on both subplots
-    x_all = np.concatenate([data[:, 0], coords[:, 0]])
-    y_all = np.concatenate([data[:, 1], coords[:, 1]])
-    x_min, x_max = x_all.min(), x_all.max()
-    y_min, y_max = y_all.min(), y_all.max()
-    ax1.set_xlim(x_min, x_max)
-    ax1.set_ylim(y_min, y_max)
-    ax2.set_xlim(x_min, x_max)
-    ax2.set_ylim(y_min, y_max)
+        # enforce same axis ranges on both subplots
+        x_all = np.concatenate([data[:, 0], coords[:, 0]])
+        y_all = np.concatenate([data[:, 1], coords[:, 1]])
+        x_min, x_max = x_all.min(), x_all.max()
+        y_min, y_max = y_all.min(), y_all.max()
+        ax1.set_xlim(x_min, x_max)
+        ax1.set_ylim(y_min, y_max)
+        ax2.set_xlim(x_min, x_max)
+        ax2.set_ylim(y_min, y_max)
 
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
     
 
 
 if __name__ == "__main__":
     # run demo with default parameters
-    demo_2d(d=2000, k=2)
+    demo_2d(d=10000, k=8, plot=True)
