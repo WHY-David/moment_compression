@@ -24,7 +24,7 @@ import faiss
 #     return eigvecs[:, 0]
 
 
-def _multi_exponents(m, k):
+def multi_exponents(m, k):
     """
     Generate all exponent-tuples e = (e_0,...,e_{m-1}) of nonnegative
     integers with sum(e) <= k, ordered by increasing total degree.
@@ -51,7 +51,7 @@ def _multi_exponents(m, k):
     return exps
 
 # compute the moment‐feature vector of a single point
-def _all_moments(w, exps):
+def all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
 
 def compress_naive(data, k, tol=1e-12):
@@ -85,7 +85,7 @@ def compress_naive(data, k, tol=1e-12):
     d, m = w.shape
 
     # build exponent list and feature dimension D
-    exps = _multi_exponents(m, k)
+    exps = multi_exponents(m, k)
     D = len(exps)                # = binom(m+k, k)
 
     # trivial if already small
@@ -107,7 +107,7 @@ def compress_naive(data, k, tol=1e-12):
         # build the D×(D+1) moment matrix A
         A = np.empty((D, D+1), dtype=float)
         for col, j in enumerate(subset):
-            A[:, col] = _all_moments(w[j], exps)
+            A[:, col] = all_moments(w[j], exps)
 
         alpha = null_space(A, rcond=1e-12)[:, 0]
         # ensure alpha has some positive entries; if not, flip its sign
@@ -130,7 +130,6 @@ def compress_naive(data, k, tol=1e-12):
     c_ = np.array([lambda_[j] * d for j in idx], dtype=float)
     w_ = w[idx, :].copy()
     return c_, w_
-
 
 
 
@@ -187,7 +186,7 @@ def compress(
     d, m = w_.shape
 
     # Build exponent list and feature dimension D
-    exps = _multi_exponents(m, k)
+    exps = multi_exponents(m, k)
     D = len(exps)
 
     # Trivial case
@@ -352,7 +351,7 @@ def compress(
         # Build D x (D+1) moment matrix for best_subset
         A = np.empty((D, target_size), dtype=float)
         for col, j in enumerate(best_subset):
-            A[:, col] = _all_moments(w_[j], exps)
+            A[:, col] = all_moments(w_[j], exps)
 
         # Null-space direction
         alpha = null_space(A, rcond=1e-12)[:, 0]

@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from moment_matching import compress, compress_naive, multi_exponents, all_moments
+
 def demo_2d(d=1000, k=2, seed=0, plot=False):
     """
     Demonstration of compress_moments_nd on 2D data:
@@ -10,48 +12,20 @@ def demo_2d(d=1000, k=2, seed=0, plot=False):
       4. Print tensor moments M_l for l=0..k and the maximum absolute error.
     """
 
-    # Step 1: generate data
+    # generate data
     np.random.seed(seed)
     data = np.random.randn(d, 2)
 
-    # Step 2: compress
+    # compress
     c_, w_ = compress(data, k, tol=1e-13)
 
-    # Step 3: compute and print tensor moments up to order k
-    def _compute_moment(arr, l):
-        if l == 0:
-            return arr.shape[0]
-        d0, m0 = arr.shape
-        M = np.zeros((m0,)*l)
-        for w in arr:
-            outer = w
-            for _ in range(l-1):
-                outer = np.multiply.outer(outer, w)
-            M += outer
-        return M
-    
-    print(f"\nMoments up to order {k}:")
-    max_err = 0.0
-    for l in range(k+1):
-        M_o = _compute_moment(data, l)
-        if l == 0:
-            M_c = c_.sum()
-        else:
-            M_c = None
-            for cj, wj in zip(c_, w_):
-                outer = wj
-                for _ in range(l-1):
-                    outer = np.multiply.outer(outer, wj)
-                if M_c is None:
-                    M_c = cj * outer
-                else:
-                    M_c = M_c + cj * outer
-        print(f"l={l}: \noriginal = {M_o}\ncompressed = {M_c}")
-        err = abs(M_o - M_c) if l == 0 else np.max(np.abs(M_o - M_c))
-        max_err = max(max_err, err)
-    print("Max tensor-moment error:", max_err)
+    # Compute tensors and calculate error
+    exps = multi_exponents(2, k)
+    moment_original = sum(all_moments(data[j,:], exps) for j in range(d))
+    moment_compressed = sum(c_[j]*all_moments(w_[j,:], exps) for j in range(c_.size))
+    max_err = np.max(np.abs(moment_original - moment_compressed))
 
-    # Step 4: plotting
+    # plotting
     if plot:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
         ax1.scatter(data[:, 0], data[:, 1], s=5, alpha=0.6)
@@ -96,9 +70,9 @@ def demo_3d(d=500, k=2, seed=0):
     c_, w_ = compress(data, k)
 
     # Compute tensors and calculate error
-    exps = _multi_exponents(3, k)
-    moment_original = sum(_all_moments(data[j,:], exps) for j in range(d))
-    moment_compressed = sum(c_[j]*_all_moments(w_[j,:], exps) for j in range(c_.size))
+    exps = multi_exponents(3, k)
+    moment_original = sum(all_moments(data[j,:], exps) for j in range(d))
+    moment_compressed = sum(c_[j]*all_moments(w_[j,:], exps) for j in range(c_.size))
     max_err = np.max(np.abs(moment_original - moment_compressed))
 
     # Plotting
@@ -117,5 +91,5 @@ def demo_3d(d=500, k=2, seed=0):
 
 if __name__ == "__main__":
     # run demo with default parameters
-    demo_2d(d=1000, k=3, plot=True)
-    # demo_3d(d=5000, k=3, seed=42)
+    # demo_2d(d=1000, k=3, plot=True)
+    demo_3d(d=1000, k=2, seed=0)
