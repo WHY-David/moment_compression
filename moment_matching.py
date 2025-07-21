@@ -142,7 +142,7 @@ def compress(
     nprobe=32,
     candidate_fraction=0.1,    # fraction of alive points used as candidate centers
     max_candidates=10000,
-    overquery=5,               # extra neighbors to fetch beyond D+1
+    overquery=2,               # extra neighbors to fetch beyond D+1
     refine=True,               # apply simple pruning refinement inside candidate cluster
     random_state=0,
     rebuild_fraction=0.30,     # retrain / rebuild when this fraction of ORIGINAL points removed
@@ -214,8 +214,8 @@ def compress(
                 _nlist = max(32, int(min(4 * np.sqrt(points.shape[0]), 8192)))
             quant = faiss.IndexFlatL2(m)
             idx = faiss.IndexIVFFlat(quant, m, _nlist, faiss.METRIC_L2)
-            # Training sample (up to 100k or all alive)
-            train_sample = min(100_000, points.shape[0])
+            # Training sample (up to 10k or all alive)
+            train_sample = min(10_000, points.shape[0])
             sample_idx = rng.choice(points.shape[0], size=train_sample, replace=False)
             idx.train(pts[sample_idx])
             idx.add(pts)
@@ -354,7 +354,7 @@ def compress(
             A[:, col] = all_moments(w_[j], exps)
 
         # Null-space direction
-        alpha = null_space(A, rcond=1e-12)[:, 0]
+        alpha = null_space(A, rcond=tol)[:, 0]
         if not np.any(alpha > 0):
             alpha = -alpha
 

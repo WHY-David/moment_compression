@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from moment_matching import compress, compress_naive, multi_exponents, all_moments
 
-def demo_2d(d=1000, k=2, seed=0, plot=False):
+def demo_2d(d=1000, k=2, seed=0, **kwargs):
     """
     Demonstration of compress_moments_nd on 2D data:
       1. Generate `d` random points in R^2 (standard normal).
@@ -14,10 +14,10 @@ def demo_2d(d=1000, k=2, seed=0, plot=False):
 
     # generate data
     np.random.seed(seed)
-    data = np.random.randn(d, 2)
+    data = np.random.rand(d, 2)
 
     # compress
-    c_, w_ = compress(data, k, tol=1e-13)
+    c_, w_ = compress(data, k, **kwargs)
 
     # Compute tensors and calculate error
     exps = multi_exponents(2, k)
@@ -26,33 +26,32 @@ def demo_2d(d=1000, k=2, seed=0, plot=False):
     max_err = np.max(np.abs(moment_original - moment_compressed))
 
     # plotting
-    if plot:
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-        ax1.scatter(data[:, 0], data[:, 1], s=5, alpha=0.6)
-        ax1.set_title("Original data ({} points)".format(d))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+    ax1.scatter(data[:, 0], data[:, 1], s=5, alpha=0.6)
+    ax1.set_title("Original data ({} points)".format(d))
 
-        coords = w_
-        weights = c_
-        # marker area `s` equal to weight so radius ∝ sqrt(c_j)
-        ax2.scatter(coords[:, 0], coords[:, 1], s=weights, alpha=0.6)
-        ax2.set_title(f"Compressed to {c_.size} atoms, moment error = {max_err:.1e}")
+    coords = w_
+    weights = c_
+    # marker area `s` equal to weight so radius ∝ sqrt(c_j)
+    ax2.scatter(coords[:, 0], coords[:, 1], s=weights, alpha=0.6)
+    ax2.set_title(f"Compressed to {c_.size} atoms, moment error = {max_err:.1e}")
 
-        # enforce same axis ranges on both subplots
-        x_all = np.concatenate([data[:, 0], coords[:, 0]])
-        y_all = np.concatenate([data[:, 1], coords[:, 1]])
-        x_min, x_max = x_all.min(), x_all.max()
-        y_min, y_max = y_all.min(), y_all.max()
-        ax1.set_xlim(x_min, x_max)
-        ax1.set_ylim(y_min, y_max)
-        ax2.set_xlim(x_min, x_max)
-        ax2.set_ylim(y_min, y_max)
+    # enforce same axis ranges on both subplots
+    x_all = np.concatenate([data[:, 0], coords[:, 0]])
+    y_all = np.concatenate([data[:, 1], coords[:, 1]])
+    x_min, x_max = x_all.min(), x_all.max()
+    y_min, y_max = y_all.min(), y_all.max()
+    ax1.set_xlim(x_min, x_max)
+    ax1.set_ylim(y_min, y_max)
+    ax2.set_xlim(x_min, x_max)
+    ax2.set_ylim(y_min, y_max)
 
-        plt.tight_layout()
-        plt.show()
+    plt.tight_layout()
+    plt.show()
     
 
 
-def demo_3d(d=500, k=2, seed=0):
+def demo_3d(d=500, k=2, seed=0, **kwargs):
     """
     Demonstration of compress_moments on 3D data:
       1. Generate `d` random points in R^3 (standard normal).
@@ -64,10 +63,10 @@ def demo_3d(d=500, k=2, seed=0):
 
     # Generate data
     np.random.seed(seed)
-    data = np.random.randn(d, 3)
+    data = np.random.rand(d, 3)
 
     # Compress
-    c_, w_ = compress(data, k)
+    c_, w_ = compress(data, k, **kwargs)
 
     # Compute tensors and calculate error
     exps = multi_exponents(3, k)
@@ -91,5 +90,5 @@ def demo_3d(d=500, k=2, seed=0):
 
 if __name__ == "__main__":
     # run demo with default parameters
-    # demo_2d(d=1000, k=3, plot=True)
-    demo_3d(d=1000, k=2, seed=0)
+    demo_2d(d=2000, k=4)
+    # demo_3d(d=1000, k=2, seed=0)
