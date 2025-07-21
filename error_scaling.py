@@ -1,5 +1,11 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import multiprocessing as mp
 from moment_matching import compress, compress_naive
+
+# sigmoid function
+def sigmoid(z):
+    return 1.0 / (1.0 + np.exp(-z))
 
 def f(data: np.ndarray, num_samples: int = 100, seed: int = 0) -> float:
     """
@@ -10,10 +16,6 @@ def f(data: np.ndarray, num_samples: int = 100, seed: int = 0) -> float:
     """
     # data.shape = (d, m)
     d, m = data.shape
-
-    # sigmoid function
-    def sigmoid(z):
-        return 1.0 / (1.0 + np.exp(-z))
 
     # draw all x's at once for efficiency
     rng = np.random.default_rng(seed)
@@ -41,39 +43,52 @@ def f_weighted(c, W, num_samples: int = 100, seed: int = 0) -> float:
     X = rng.standard_normal((num_samples, m))
     # compute dot products: shape (num_samples, L)
     D = X @ W.T
-    # sigmoid(2*D), weighted sum
-    S = (1.0 / (1.0 + np.exp(-D))) @ c  # shape (num_samples,)
+
+    S = sigmoid(D) @ c  # shape (num_samples,)
     return S.mean()
 
 
+
+
+
+# parameters
+m = 2   # dimension of each point
+d_list = [100, 200, 400, 800, 1600, 3200]
+trials_per_d = 10
+num_samples = 10
+seed_data = 0
+seed_f = 42
+k_list = [1, 2, 3, 4]
+
+# initialize results dict: results[k][d] = list of errors
+results = {k: {d: [] for d in d_list} for k in k_list}
+
+
+# determine the final data set size
+def dstop(d):
+    return int(1.5*d**0.5)
+
+def run_trial(args):
+    k, d, t = args
+    rng = np.random.default_rng(seed_data + t)
+    data = rng.random((d, m))
+    orig = f(data, num_samples=num_samples, seed=seed_f)
+    c, W = compress(data, k, dstop = dstop(d), index_type='flat')
+    # c, W = compress_naive(data, k, dstop=dstop(d))
+    comp = f_weighted(c, W, num_samples=num_samples, seed=seed_f)
+    return k, d, abs(comp - orig)
+
+
+
+
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
+    tasks = [(k, d, t) for k in k_list for d in d_list for t in range(trials_per_d)]
+    with mp.Pool() as pool:
+        results_list = pool.map(run_trial, tasks)
 
-    # parameters
-    m = 2   # dimension of each point
-    d_list = [100, 200, 400, 800, 1600, 3200]
-    trials_per_d = 5
-    num_samples = 10
-    seed_data = 0
-    seed_f = 42
-    k_list = [1, 2, 3, 4]
-
-    # initialize results dict: results[k][d] = list of errors
-    results = {k: {d: [] for d in d_list} for k in k_list}
-
-    for k in k_list:
-        for d in d_list:
-            for t in range(trials_per_d):
-                rng = np.random.default_rng(seed_data + t)
-                data = rng.random((d, m))
-                # compute original f
-                orig = f(data, num_samples=num_samples, seed=seed_f)
-                # compress_naive to degree k
-                c, W = compress(data, k)
-                # compute weighted f on compressed support
-                comp = f_weighted(c, W, num_samples=num_samples, seed=seed_f)
-                # record absolute error
-                results[k][d].append(abs(comp - orig))
+    # populate results dictionary
+    for k, d, err in results_list:
+        results[k][d].append(err)
 
     # compute mean errors for each k
     mean_errors = {
@@ -94,7 +109,7 @@ if __name__ == "__main__":
     plt.yscale('log')
     plt.xlabel(r"Data set size $d$")
     plt.ylabel(r"$|f_{\mathrm{comp}} - f_{\mathrm{orig}}|$")
-    plt.title(r"Error vs. $d$ for matching degrees 1-4")
+    plt.title(r"Compression: $d \to 1.5\sqrt{d}$")
     plt.legend()
     plt.tight_layout()
     plt.show()

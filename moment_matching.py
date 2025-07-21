@@ -2,6 +2,7 @@ import numpy as np
 import itertools
 from scipy.linalg import null_space
 import faiss
+import warnings
 
 
 # def null_vector(A, tol=1e-12, maxiter=1000, operator=False):
@@ -54,7 +55,7 @@ def multi_exponents(m, k):
 def all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
 
-def compress_naive(data, k, tol=1e-12):
+def compress_naive(data, k, dstop=None, tol=1e-12):
     """
     Compress a dataset of d points in R^m down to at most
       binom(m+k, k)
@@ -87,10 +88,14 @@ def compress_naive(data, k, tol=1e-12):
     # build exponent list and feature dimension D
     exps = multi_exponents(m, k)
     D = len(exps)                # = binom(m+k, k)
+    if dstop is None:
+        dstop = D
+    elif dstop < D:
+        warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
+        dstop = D
 
-    # trivial if already small
-    if d <= D:
-        # trivial case: exactly d atoms with weight 1 each
+    # if d already small, return
+    if d <= dstop:
         c_ = np.ones(d, dtype=float)
         w_ = w.copy()
         return c_, w_
@@ -135,7 +140,8 @@ def compress_naive(data, k, tol=1e-12):
 
 def compress(
     data,
-    k,
+    k: int,
+    dstop=None,           # stop when d <= dstop; None means dstop = binom(m+k, k)
     tol=1e-12,
     index_type='flat',          # 'ivf' or 'flat'
     nlist=None,
@@ -188,9 +194,14 @@ def compress(
     # Build exponent list and feature dimension D
     exps = multi_exponents(m, k)
     D = len(exps)
+    if dstop is None:
+        dstop = D
+    elif dstop < D:
+        warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
+        dstop = D
 
-    # Trivial case
-    if d <= D:
+    # If d already small, return trivial case
+    if d <= dstop:
         c_ = np.ones(d, dtype=float)
         return c_, w_.copy()
 
@@ -200,7 +211,6 @@ def compress(
     removed_total = 0
     next_rebuild_threshold = rebuild_fraction * d
 
-    # ---- FAISS index helpers ----
     def build_index(points):
         """Build or rebuild FAISS index on ALL alive points (or full set at start)."""
         pts = points.astype(np.float32)
@@ -241,7 +251,6 @@ def compress(
             # Set next threshold
             next_rebuild_threshold += rebuild_fraction * d
 
-    # Diameter utilities
     def diameter(idx_subset):
         Y = w_[idx_subset]
         norms = np.sum(Y * Y, axis=1, keepdims=True)
@@ -327,7 +336,7 @@ def compress(
     # ---- Main iterative Carathéodory peeling ----
     active_count = np.count_nonzero(alive)
     iteration = 0
-    while active_count > D:
+    while active_count > dstop:
         iteration += 1
         # Select a (D+1) subset with small diameter
         target_size = D + 1
