@@ -59,6 +59,8 @@ num_samples = 10
 seed_data = 0
 seed_f = 42
 k_list = [1, 2, 3, 4]
+plot_error_bars = True
+
 
 # initialize results dict: results[k][d] = list of errors
 results = {k: {d: [] for d in d_list} for k in k_list}
@@ -96,15 +98,30 @@ if __name__ == "__main__":
         for k in k_list
     }
 
+    # compute standard deviations for each k and d
+    std_errors = {
+        k: [np.std(results[k][d]) for d in d_list]
+        for k in k_list
+    }
+
     # plot average error vs. d for each k with fitted power-law exponents
     plt.figure(figsize=(8, 5))
     d_vals = np.array(d_list)
     for k in k_list:
         errs = mean_errors[k]
+        stds = std_errors[k]
         # fit power-law exponent α_k: err ∝ d^α_k
         coeffs = np.polyfit(np.log(d_vals), np.log(errs), 1)
         alpha_k = coeffs[0]
-        plt.plot(d_list, errs, marker='o', label=f"k={k}, power={alpha_k:.3f}")
+        if plot_error_bars:
+            plt.errorbar(
+                d_list, errs, yerr=stds, marker='o',
+                linestyle='-', capsize=3,
+                label=f"k={k}, power={alpha_k:.3f}"
+            )
+        else:
+            plt.plot(d_list, errs, marker='o', linestyle='-', label=f"k={k}, power={alpha_k:.3f}")
+
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel(r"Data set size $d$")
