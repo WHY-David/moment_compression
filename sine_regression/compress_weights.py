@@ -74,10 +74,10 @@ def compress_nn(net, dstop=100, k=1):
     return new_net
 
 if __name__ == '__main__':
-    dstop = 50
-    k = 3
+    dstop = 20
+    k = 2
 
-    net = load_model(hidden_dim=2000)
+    net = load_model(hidden_dim=5000)
     compressed_net = compress_nn(net, dstop=dstop, k=k)
 
     with torch.no_grad():

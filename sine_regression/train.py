@@ -4,6 +4,9 @@ from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 import os
 
+# # Device configuration
+# device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+
 # model: input → hidden Tanh → output
 class TwoLayerNet(nn.Module):
     def __init__(self, input_dim, hidden_dim):
@@ -21,8 +24,8 @@ if __name__ == '__main__':
     device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 
     # hyperparams
-    hidden_dim = 2000
-    lr = 4e-4
+    hidden_dim = 5000
+    lr = 5e-3
     batch_size = 32
     epochs = 1000
 
