@@ -52,15 +52,14 @@ def f_weighted(c, W, num_samples: int = 100, seed: int = 0) -> float:
 
 
 # parameters
-m = 2   # dimension of each point
+m = 1   # dimension of each point
 d_list = [100, 200, 400, 800, 1600, 3200, 6400]
 trials_per_d = 10
 num_samples = 10
 seed_data = 0
 seed_f = 42
 k_list = [1, 2, 3, 4]
-plot_error_bars = True
-filename = 'figures/sqrt_m2.pdf'
+filename = 'figures/const_m1.pdf'
 
 
 # initialize results dict: results[k][d] = list of errors
@@ -69,9 +68,9 @@ results = {k: {d: [] for d in d_list} for k in k_list}
 
 # determine the final data set size
 def dstop(d):
-    return int(3.5*d**0.5)
+    # return int(3.5*d**0.5)
     # return int(0.35*d)
-    # return 35
+    return 35
 
 def run_trial(args):
     k, d, t = args
@@ -95,20 +94,13 @@ if __name__ == "__main__":
     for k, d, err in results_list:
         results[k][d].append(err)
 
-    # compute mean errors for each k
-    mean_errors = {
-        k: [np.mean(results[k][d]) for d in d_list]
+    # compute max errors for each k
+    max_errors = {
+        k: [np.max(results[k][d]) for d in d_list]
         for k in k_list
     }
 
-    # compute standard deviations for each k and d
-    std_errors = {
-        k: [np.std(results[k][d]) for d in d_list]
-        for k in k_list
-    }
-
-    # plot average error vs. d for each k with fitted power-law exponents
-    # fixed axes frame size in points (same as plot_both)
+    # plot max error vs. d for each k with fitted power-law exponents
     axes_width_pt = 360
     axes_height_pt = 0.7 * axes_width_pt
     left_margin_pt, right_margin_pt = 35, 35
@@ -126,25 +118,17 @@ if __name__ == "__main__":
 
     d_vals = np.array(d_list)
     for k in k_list:
-        errs = mean_errors[k]
-        stds = std_errors[k]
+        errs = max_errors[k]
         # fit power-law exponent α_k: err ∝ d^α_k
         coeffs = np.polyfit(np.log(d_vals), np.log(errs), 1)
         alpha_k = coeffs[0]
-        if plot_error_bars:
-            plt.errorbar(
-                d_list, errs, yerr=stds, marker='o',
-                linestyle='-', capsize=3,
-                label=f"k={k}, power={alpha_k:.3f}"
-            )
-        else:
-            plt.plot(d_list, errs, marker='o', linestyle='-', label=f"k={k}, power={alpha_k:.3f}")
+        plt.plot(d_list, errs, marker='o', linestyle='-', label=f"k={k}, power={alpha_k:.3f}")
 
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel(r"Data set size $d$")
     plt.ylabel(r"$|f_{\mathrm{comp}} - f_{\mathrm{orig}}|$")
-    plt.title(r"Compression: $d \to 3.5\sqrt{d}$. "+f"Data dimension m={m}")
+    plt.title(r"Compression: $d \to 35$. "+f"Data dimension m={m}")
     plt.legend()
     plt.tight_layout()
     plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
