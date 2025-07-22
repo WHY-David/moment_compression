@@ -53,13 +53,14 @@ def f_weighted(c, W, num_samples: int = 100, seed: int = 0) -> float:
 
 # parameters
 m = 2   # dimension of each point
-d_list = [100, 200, 400, 800, 1600, 3200]
+d_list = [100, 200, 400, 800, 1600, 3200, 6400]
 trials_per_d = 10
 num_samples = 10
 seed_data = 0
 seed_f = 42
 k_list = [1, 2, 3, 4]
 plot_error_bars = True
+filename = 'figures/sqrt_m2.pdf'
 
 
 # initialize results dict: results[k][d] = list of errors
@@ -68,7 +69,9 @@ results = {k: {d: [] for d in d_list} for k in k_list}
 
 # determine the final data set size
 def dstop(d):
-    return int(1.5*d**0.5)
+    return int(3.5*d**0.5)
+    # return int(0.35*d)
+    # return 35
 
 def run_trial(args):
     k, d, t = args
@@ -105,7 +108,22 @@ if __name__ == "__main__":
     }
 
     # plot average error vs. d for each k with fitted power-law exponents
-    plt.figure(figsize=(8, 5))
+    # fixed axes frame size in points (same as plot_both)
+    axes_width_pt = 360
+    axes_height_pt = 0.7 * axes_width_pt
+    left_margin_pt, right_margin_pt = 35, 35
+    bottom_margin_pt, top_margin_pt = 30, 20
+    fig_width_pt = left_margin_pt + axes_width_pt + right_margin_pt
+    fig_height_pt = bottom_margin_pt + axes_height_pt + top_margin_pt
+
+    fig = plt.figure(figsize=(fig_width_pt/72, fig_height_pt/72))
+    ax = fig.add_axes([
+        left_margin_pt/fig_width_pt,
+        bottom_margin_pt/fig_height_pt,
+        axes_width_pt/fig_width_pt,
+        axes_height_pt/fig_height_pt
+    ])
+
     d_vals = np.array(d_list)
     for k in k_list:
         errs = mean_errors[k]
@@ -126,7 +144,8 @@ if __name__ == "__main__":
     plt.yscale('log')
     plt.xlabel(r"Data set size $d$")
     plt.ylabel(r"$|f_{\mathrm{comp}} - f_{\mathrm{orig}}|$")
-    plt.title(r"Compression: $d \to 1.5\sqrt{d}$")
+    plt.title(r"Compression: $d \to 3.5\sqrt{d}$. "+f"Data dimension m={m}")
     plt.legend()
     plt.tight_layout()
+    plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()
