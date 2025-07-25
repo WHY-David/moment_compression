@@ -16,6 +16,7 @@ def demo_2d(d=1000, k=2, seed=0, **kwargs):
     np.random.seed(seed)
     data = np.random.rand(d, 2)
 
+
     # compress
     c_, w_ = compress(data, k, **kwargs)
 
@@ -33,7 +34,7 @@ def demo_2d(d=1000, k=2, seed=0, **kwargs):
     coords = w_
     weights = c_
     # marker area `s` equal to weight so radius ∝ sqrt(c_j)
-    ax2.scatter(coords[:, 0], coords[:, 1], s=weights, alpha=0.6)
+    ax2.scatter(coords[:, 0], coords[:, 1], s=weights*10, alpha=0.6)
     ax2.set_title(f"Compressed to {c_.size} atoms, moment error = {max_err:.1e}")
 
     # enforce same axis ranges on both subplots
@@ -90,5 +91,5 @@ def demo_3d(d=500, k=2, seed=0, **kwargs):
 
 if __name__ == "__main__":
     # run demo with default parameters
-    demo_2d(d=2000, k=4)
+    demo_2d(d=50, k=3)
     # demo_3d(d=1000, k=2, seed=0)

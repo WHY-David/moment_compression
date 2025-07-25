@@ -3,9 +3,8 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 import os
+import numpy as np
 
-# # Device configuration
-# device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 
 # model: input → hidden Tanh → output
 class TwoLayerNet(nn.Module):
@@ -24,17 +23,30 @@ if __name__ == '__main__':
     device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 
     # hyperparams
-    hidden_dim = 5000
-    lr = 5e-3
-    batch_size = 32
+    hidden_dim = 100
+    lr = 1e-2
+    batch_size = 64
     epochs = 1000
 
     # data
-    N = 2000
-    x = torch.rand(N, 1, device=device)
-    y = torch.sin(2 * torch.pi * x)
-    ds = TensorDataset(x, y)
-    loader = DataLoader(ds, batch_size=batch_size, shuffle=True)
+    data = np.loadtxt('noisy_sin_10000.csv', delimiter=',')
+    x = torch.from_numpy(data[:, [0]]).float().to(device)
+    y = torch.from_numpy(data[:, [1]]).float().to(device)
+    # uniform weights
+    weights = torch.ones(len(x), device='cpu')
+    # draw len(weights) indices *with replacement* according to weights
+    sampler = torch.utils.data.WeightedRandomSampler(
+        weights,          # uniform weights
+        num_samples=len(weights),
+        replacement=True  # True allows repeats within a batch
+    )
+
+    loader = DataLoader(
+        TensorDataset(x, y),
+        batch_size=batch_size,
+        sampler=sampler,  # sampler OR shuffle, not both
+        num_workers=0,    # optional
+    )
 
     # instantiate
     net = TwoLayerNet(1, hidden_dim).to(device)
@@ -65,14 +77,16 @@ if __name__ == '__main__':
         test_loss = loss_fn(y_pred, y_test)
         print(f"\nTest MSE: {test_loss.item():.4f}")
 
-        # Plot true function and NN predictions
+        # Plot true function, NN predictions, and training data
         x_plot = x_test.cpu().numpy().squeeze()
         y_true = y_test.cpu().numpy().squeeze()
         y_pred_np = y_pred.cpu().numpy().squeeze()
 
         plt.figure()
-        plt.plot(x_plot, y_true, label='sin(2πx)')
-        plt.plot(x_plot, y_pred_np, label='NN prediction')
+        plt.plot(x_plot, y_true, 'g--', label='sin(2πx)')
+        plt.plot(x_plot, y_pred_np, color='orange', label='NN prediction')
+        plt.scatter(x.cpu().numpy().squeeze(), y.cpu().numpy().squeeze(), s=10, alpha=0.3, label='Original training data')
+
         plt.xlabel('x')
         plt.ylabel('y')
         plt.legend()
