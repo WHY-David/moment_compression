@@ -55,60 +55,50 @@ if __name__ == '__main__':
     y = torch.from_numpy(w_[:, [1]]).float().to(device)
     weights = torch.from_numpy(c_).float()  # positive weights
 
-    sampler = torch.utils.data.WeightedRandomSampler(
-        weights,          # uniform weights
-        num_samples=len(data_full),
-        replacement=True  # True allows repeats within a batch
-    )
-
-    loader = DataLoader(
-        TensorDataset(x, y),
-        batch_size=batch_size,
-        sampler=sampler,  # sampler OR shuffle, not both
-        num_workers=0,    # optional
-    )
-
     # instantiate
     net = TwoLayerNet(1, hidden_dim).to(device)
-    opt = torch.optim.Adam(net.parameters(), lr=lr)
-    loss_fn = nn.MSELoss()
+    opt = torch.optim.Adam(net.parameters(), lr=lr)    
 
-    # # training loop (switchable full-batch / weighted SGD)
-    # for epoch in range(1, epochs+1):
-    #     if use_sgd:
-    #         # sample a minibatch of weighted support indices
-    #         batch_idx = np.random.choice(len(weights),
-    #                                      size=batch_size,
-    #                                      replace=True,
-    #                                      p=probs)
-    #         xb = x[batch_idx]
-    #         yb = y[batch_idx]
-    #         # wb = weights[batch_idx]
-    #         # # rescale to keep total minibatch weight = batch_size
-    #         # wb = wb * (batch_size / wb.sum())
-    #         pred = net(xb)
-    #         loss = torch.mean((pred - yb) ** 2)
-    #     else:
-    #         # full-batch weighted MSE
-    #         pred = net(x)
-    #         loss = torch.sum(weights.unsqueeze(1) * (pred - y)**2)
+    if use_sgd:
+        sampler = torch.utils.data.WeightedRandomSampler(
+            weights,          # uniform weights
+            num_samples=len(data_full),
+            replacement=True  # True allows repeats within a batch
+        )
 
-    #     opt.zero_grad()
-    #     loss.backward()
-    #     opt.step()
-    #     if epoch % 100 == 0:
-    #         print(f"Epoch {epoch:4d}  Loss: {loss.item():.4f}")
+        loader = DataLoader(
+            TensorDataset(x, y),
+            batch_size=batch_size,
+            sampler=sampler,  # sampler OR shuffle, not both
+            num_workers=0,    # optional
+        )
 
-    # training loop
-    for epoch in range(1, epochs+1):
-        for xb, yb in loader:
-            pred = net(xb)
-            loss = loss_fn(pred, yb)
+        loss_fn = nn.MSELoss()
+
+        # training loop
+        for epoch in range(1, epochs+1):
+            for xb, yb in loader:
+                pred = net(xb)
+                loss = loss_fn(pred, yb)
+                opt.zero_grad()
+                loss.backward()
+                opt.step()
+            if epoch % 100 == 0:
+                print(f"Epoch {epoch:4d}  Loss: {loss.item():.4f}")
+    else:
+        for epoch in range(1, epochs+1):
+            # # full-batch training
+            # pred = net(x.to(device))
+            # # compute weighted MSE over the full set
+            # per_sample_mse = ((pred - y.to(device)).view(-1, pred.size(-1))**2).mean(dim=1)
+            # loss = (w.to(device) * per_sample_mse).sum()/w.sum()
             opt.zero_grad()
             loss.backward()
             opt.step()
-        if epoch % 100 == 0:
-            print(f"Epoch {epoch:4d}  Loss: {loss.item():.4f}")
+            if epoch % 100 == 0:
+                print(f"Epoch {epoch:4d}  Loss: {loss.item():.4f}")
+
+
 
     # evaluation and visualization
     with torch.no_grad():
