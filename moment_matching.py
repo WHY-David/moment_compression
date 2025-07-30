@@ -138,6 +138,7 @@ def compress_naive(data, k, dstop=None, tol=1e-12):
 
 
 
+
 def compress(
     data,
     k: int,
