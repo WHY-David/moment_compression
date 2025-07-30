@@ -37,7 +37,7 @@ if __name__ == '__main__':
     # draw len(weights) indices *with replacement* according to weights
     sampler = torch.utils.data.WeightedRandomSampler(
         weights,          # uniform weights
-        num_samples=len(weights),
+        num_samples=len(data),
         replacement=True  # True allows repeats within a batch
     )
 
