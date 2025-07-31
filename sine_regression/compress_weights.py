@@ -5,7 +5,7 @@ import torch.nn as nn
 from train import TwoLayerNet
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from moment_matching import compress
+from compressor import Compressor
 
 # Device configuration
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
@@ -50,13 +50,13 @@ def extract(net):
 
 def compress_nn(net, dstop=100, k=1):
     """
-    Compresses the two-layer net to width dstop using moment_matching.compress.
+    Compresses the two-layer net to width dstop
     Returns a new TwoLayerNet with hidden_dim=dstop.
     """
     # Extract original weights
     w_orig, c = extract(net)
-    # Prune to dstop atoms with k=3
-    c_pruned, w_pruned = compress(w_orig, k=k, dstop=dstop)
+    cp = Compressor(w_orig)
+    c_pruned, w_pruned = cp.compress(k, dstop=dstop)
     # Build new network
     new_net = TwoLayerNet(input_dim=1, hidden_dim=dstop).to(device)
     new_net.eval()

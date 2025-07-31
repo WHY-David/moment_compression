@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
-from moment_matching import compress, compress_naive, multi_exponents, all_moments
+from compressor import Compressor
 
 import torch
 import torch.nn as nn
@@ -49,7 +49,8 @@ if __name__ == '__main__':
 
     # generate weighted training set via moment-matching compression
     data_full = np.loadtxt('noisy_sin_10000.csv', delimiter=',')
-    c_, w_ = compress(data_full, k=3, dstop=50)
+    cp = Compressor(data_full)
+    c_, w_ = cp.compress(3, dstop=50)
     print("Compression finished. ")
     x = torch.from_numpy(w_[:, [0]]).float().to(device)
     y = torch.from_numpy(w_[:, [1]]).float().to(device)

@@ -101,7 +101,7 @@ class Compressor:
         idmap = faiss.IndexIDMap2(ivf)
         idmap.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
 
-        print(f"Rebuilt ivf index: nlist={nlist}, nprobe={nprobe}, alive={alive_n}, train_sz={train_sz}")
+        # print(f"Rebuilt ivf index: nlist={nlist}, nprobe={nprobe}, alive={alive_n}, train_sz={train_sz}")
         return idmap
 
 
@@ -155,18 +155,15 @@ class Compressor:
                 best_diam = diam
                 best_subset = subset
 
-        if best_subset is None:
+        if best_subset is None or self.alive.size <= 20000:
             if self.index_type == 'ivf':
-                # Prompt and fallback to exact Flat index
                 print("[fallback] IVF search failed to find a viable subset; switching to Flat (IndexFlatL2) and retrying once.")
-                # Change index type and rebuild flat index as in __init__ lines 66–68
                 self.index_type = 'flat'
                 self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
                 self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
                 return self._find_best_subset(target_size, overquery, candidate_fraction, max_candidates)
             raise RuntimeError(
                 "Failed to find a viable subset of the requested size among alive points; "
-                "try reducing nlist (increase list occupancy), increasing nprobe, or using a flat fallback."
             )
         
         return best_diam, best_subset
@@ -207,7 +204,7 @@ class Compressor:
         candidate_fraction=0.1,     # fraction of alive points used as candidate centers
         max_candidates: int=5000,
         overquery: int=5,                # extra neighbors to fetch beyond D+1
-        rebuild_interval: int=5,      # retrain / rebuild when this fraction of ORIGINAL points removed
+        rebuild_interval: int=2,      # retrain / rebuild when this fraction of ORIGINAL points removed
         verbose: bool=False, 
         return_at=None  # None or list; list ordered from small to large
         ):
@@ -247,7 +244,7 @@ class Compressor:
                     return_list.pop()
 
             if verbose:
-                print(f"diameter={best_diam:.4e}, #alive={self.alive.size}, best_subset=\n{list(best_subset)}")
+                print(f"diameter={best_diam:.4e}, #alive={self.alive.size}")
 
             # Rebuild if enough removals accumulated (IVF only)
             if self.index_type == 'ivf' and self.alive.size <= rebuild_threshold:
