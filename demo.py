@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from moment_matching import compress, compress_naive, multi_exponents, all_moments
+# from compressor import Compressor, multi_exponents, all_moments
 
 def demo_2d(d=1000, k=2, seed=0, **kwargs):
     """
@@ -14,11 +15,12 @@ def demo_2d(d=1000, k=2, seed=0, **kwargs):
 
     # generate data
     np.random.seed(seed)
-    data = np.random.rand(d, 2)
-
+    data = np.random.randn(d, 2)
 
     # compress
-    c_, w_ = compress(data, k, **kwargs)
+    # compressor = Compressor(data, tol=1e-12)
+    # c_, w_ = compressor.compress(k, **kwargs)
+    c_, w_ = compress(data, k, tol=1e-12, **kwargs)
 
     # Compute tensors and calculate error
     exps = multi_exponents(2, k)
@@ -91,5 +93,5 @@ def demo_3d(d=500, k=2, seed=0, **kwargs):
 
 if __name__ == "__main__":
     # run demo with default parameters
-    demo_2d(d=50, k=3)
+    demo_2d(d=500, k=4, dstop=30)
     # demo_3d(d=1000, k=2, seed=0)

@@ -3,6 +3,7 @@ import itertools
 from scipy.linalg import null_space
 import faiss
 import warnings
+from copy import copy
 
 def multi_exponents(m, k):
     """
@@ -35,44 +36,6 @@ def all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
 
 
-class AliveMask:
-    def __init__(self, size, packed=True):
-        self.size = size
-        self.packed = packed
-        self.arr = np.ones(((size + 7) // 8,), dtype=np.uint8) if packed \
-                   else np.ones(size, dtype=np.bool_)
-
-    def is_alive(self, ids: np.ndarray) -> np.ndarray:
-        ids = ids.astype(np.int64)
-        if self.packed:
-            byte = ids // 8
-            bit  = ids % 8
-            return ((self.arr[byte] >> bit) & 1).astype(bool)
-        else:
-            return self.arr[ids]
-
-    def kill(self, id_: int):
-        if self.packed:
-            self.arr[id_ // 8] &= ~(1 << (id_ % 8))
-        else:
-            self.arr[id_] = False
-
-    def count_alive(self) -> int:
-        """Return the number of alive ids."""
-        if self.packed:
-            if self.arr.size == 0:
-                return 0
-            bits = np.unpackbits(self.arr)[: self.size]
-            return int(bits.sum())
-        else:
-            return int(self.arr.sum())
-
-    def alive_fraction(self) -> float:
-        """Return fraction of alive ids in [0,1]."""
-        cnt = self.count_alive()
-        return cnt / float(self.size) if self.size > 0 else 0.0
-
-
 class Compressor:
     """
     Moment compression with diameter-aware Carathéodory peeling.
@@ -82,74 +45,52 @@ class Compressor:
         c_, w_ = comp.run()
     """
     def __init__(self, data, weights=None, tol=1e-12, random_state=0, index_type='flat'):
-        self.w_ = np.asarray(data, dtype=float)
+        self.w_ = np.asarray(data, dtype=np.float32)
         if self.w_.ndim != 2:
             raise ValueError("`data` must be a 2D array of shape (d, m)")
         self.d, self.m = self.w_.shape
 
         self.index_type = index_type
         self.tol = tol
-
-        # self.candidate_fraction = candidate_fraction
-        # self.max_candidates = max_candidates
-        # self.overquery = overquery
-        # self.refine = refine
-        # self.rebuild_fraction = rebuild_fraction
-
         self.rng = np.random.default_rng(random_state)
 
-
         if weights is None:
-            self.c_ = np.full(self.d, 1.0/self.d)
+            self.c_ = np.full(self.d, 1.0)
         else:
             self.c_ = np.asarray(weights, dtype=float)
-            assert len(self.c_) == self.d
-            self.c_ /= np.sum(self.c_)
-        self.alive = (self.c_ > self.tol)
-        self.next_rebuild_threshold = self.rebuild_fraction * self.d
-
-        # Mapping between FAISS IDs and original indices
-        self.alive_indices = np.arange(self.d)[self.alive]
+            assert len(self.c_) == self.d   
+        self.alive_idx = np.nonzero(self.c_ > self.tol)[0]
 
         # Build initial index
-        self.index = faiss.IndexFlatL2(self.m)
-        self._build_index(self.w_[self.alive])
-
-
-    # ------------------------ Internal helpers ------------------------
-    def _build_index(self, points: np.ndarray):
-        """Build or rebuild FAISS index on provided points."""
-        pts = points.astype(np.float32)
-        if self.index_type == 'flat':
-            self.index.add(pts)
-        elif self.index_type == 'ivf':
-            # automatic params
-            _nlist = max(32, int(min(4 * np.sqrt(points.shape[0]), 8192)))
-            _nprobe = 32
-            _max_sample = 10000
-
-            self.index = faiss.IndexIVFFlat(self.index, self.m, _nlist, faiss.METRIC_L2)
-            # Training sample (up to 10k or all alive)
-            if pts.shape[0] <= 10000:
-                self.index.train(pts)
-            else:
-                sample_idx = self.rng.choice(pts.shape[0], size=_max_sample, replace=False)
-                self.index.train(pts[sample_idx])
-            self.index.add(pts)
-            self.index.nprobe = _nprobe
+        if index_type == 'flat':
+            self.index = faiss.IndexFlatL2(self.m)
+            self.index = faiss.IndexIDMap2(self.index)
+            self.index.add_with_ids(self.w_[self.alive_idx], self.alive_idx)
+        elif index_type == 'ivf':
+            self.index = self._build_ivf_index()
         else:
             raise ValueError("index_type must be 'ivf' or 'flat'.")
 
-    def _rebuild_if_needed(self):
-        """Rebuild the index on current alive points when enough removals have accumulated."""
-        if self.removed_total >= self.next_rebuild_threshold:
-            self.alive_indices = np.where(self.alive)[0]
-            if self.index_type == 'ivf':
-                self.index = self._build_index(self.w_[self.alive])
-            else:
-                # For Flat, rebuilding is optional; keep behavior consistent with verbose monitoring
-                self.index = self._build_index(self.w_)
-            self.next_rebuild_threshold += self.rebuild_fraction * self.d
+
+    # ------------------------ Internal helpers ------------------------
+    def _build_ivf_index(self):
+        """(re)build ivf data from scratch and train on a sample of alive points"""
+        _nlist = max(32, int(min(4 * np.sqrt(self.alive_idx.size), 8192)))
+        _nprobe = 32
+        _max_sample = 10000
+
+        index = faiss.IndexFlatL2(self.m)
+        index = faiss.IndexIVFFlat(index, self.m, _nlist, faiss.METRIC_L2)
+        if self.alive_idx.size <= _max_sample:
+            index.train(self.w_[self.alive_idx])
+        else:
+            sample_idx = self.rng.choice(self.alive_idx, size=_max_sample, replace=False)
+            index.train(self.w_[sample_idx])
+
+        index = faiss.IndexIDMap2(index)
+        index.add_with_ids(self.w_[self.alive_idx], self.alive_idx)
+        index.nprobe = _nprobe
+        return index
 
     def _diameter(self, idx_subset: np.ndarray) -> float:
         Y = self.w_[idx_subset]
@@ -158,7 +99,7 @@ class Compressor:
         np.fill_diagonal(D2, 0.0)
         return float(np.sqrt(np.max(D2)))
 
-    def _refine_prune(self, indices: np.ndarray, target_size: int) -> np.ndarray:
+    def _refine_prune(self, indices, target_size: int) -> np.ndarray:
         """Greedy remove the point with largest average distance until the target size is reached."""
         idxs = list(indices)
         while len(idxs) > target_size:
@@ -171,71 +112,44 @@ class Compressor:
             del idxs[remove_pos]
         return np.array(idxs, dtype=int)
 
-    def _choose_candidate_centers(self) -> np.ndarray:
+    def _choose_candidate_centers(self, candidate_fraction, max_candidates) -> np.ndarray:
         """Return a random subset of alive original indices to serve as candidate centers."""
-        alive_idx = np.where(self.alive)[0]
-        ccount = int(min(max(1, self.candidate_fraction * alive_idx.size), self.max_candidates))
-        if ccount >= alive_idx.size:
-            return alive_idx
-        return self.rng.choice(alive_idx, size=ccount, replace=False)
+        ccount = int(min(max(1, candidate_fraction * self.alive_idx.size), max_candidates))
+        if ccount >= self.alive_idx.size:
+            return self.alive_idx
+        return self.rng.choice(self.alive_idx, size=ccount, replace=False)
+    
+    def _find_best_subset(self, target_size: int, overquery: int, candidate_fraction, max_candidates):
+        n_neigh = target_size + overquery
+        if target_size <= self.alive_idx.size < n_neigh:
+            n_neigh = self.alive_idx.size
 
-    def _center_neighbors(self, center_orig_idx: int, need: int) -> np.ndarray:
-        """
-        Return up to `need` alive neighbor original indices INCLUDING the center.
-        Uses a loop with growing k_query if dead points occupy slots.
-        """
-        if self.index_type == 'flat':
-            query_vec = self.w_[center_orig_idx].astype(np.float32)[None, :]
-            k_query = min(self.w_.shape[0], need + self.overquery)
-            while k_query <= self.w_.shape[0]:
-                _, neigh = self.index.search(query_vec, k_query)
-                neigh_ids = neigh[0]
-                alive_neigh = [i for i in neigh_ids if self.alive[i]]
-                if center_orig_idx not in alive_neigh:
-                    alive_neigh.insert(0, center_orig_idx)
-                # Uniquify while preserving order
-                seen = set()
-                filtered = []
-                for v in alive_neigh:
-                    if v not in seen:
-                        seen.add(v)
-                        filtered.append(v)
-                    if len(filtered) >= need:
-                        break
-                if len(filtered) >= need or k_query == self.w_.shape[0]:
-                    return np.array(filtered[:need], dtype=int)
-                k_query = min(self.w_.shape[0], int(k_query * 1.5) + 1)
-            return np.array(filtered, dtype=int)
-        else:
-            query_vec = self.w_[center_orig_idx].astype(np.float32)[None, :]
-            alive_count = self.alive_indices.size
-            k_query = min(alive_count, need + self.overquery)
-            while k_query <= alive_count:
-                _, neigh = self.index.search(query_vec, k_query)
-                mapped = self.alive_indices[neigh[0]]
-                alive_neigh = [i for i in mapped if self.alive[i]]
-                if center_orig_idx not in alive_neigh:
-                    alive_neigh.insert(0, center_orig_idx)
-                seen = set()
-                filtered = []
-                for v in alive_neigh:
-                    if v not in seen:
-                        seen.add(v)
-                        filtered.append(v)
-                    if len(filtered) >= need:
-                        break
-                if len(filtered) >= need or k_query == alive_count:
-                    return np.array(filtered[:need], dtype=int)
-                k_query = min(alive_count, int(k_query * 1.5) + 1)
-            return np.array(filtered, dtype=int)
+        best_subset = None
+        best_diam = np.inf
+
+        candidates = self._choose_candidate_centers(candidate_fraction, max_candidates)
+        center_vecs = self.w_[candidates, :]
+        _, I = self.index.search(center_vecs, n_neigh)
+        # If not found, I will be padded by -1. I.shape = nq*m
+        for subset in I:
+            subset = self._refine_prune(subset, target_size)
+            diam = self._diameter(subset)
+            if diam < best_diam:
+                best_diam = diam
+                best_subset = subset
+
+        if best_subset is None:
+            raise RuntimeError("Failed to find a viable subset of size Nmk+1 among alive points.")
         
-    def _reduce1(self, subset, self.tol=1e-12):
+        return best_diam, best_subset
+        
+    def _reduce1(self, subset):
         '''
         Caratheodory peeling
         Ensure len(subset) = Nmk+1
         '''
         # Build D x (D+1) moment matrix for best_subset
-        A = np.empty((Nmk, len(subset)), dtype=float)
+        A = np.empty((len(self.exps), len(subset)), dtype=float)
         for col, j in enumerate(subset):
             A[:, col] = all_moments(self.w_[j], self.exps)
 
@@ -247,31 +161,28 @@ class Compressor:
         # Determine maximal step t
         t = min((self.c_[j] / a_j) for a_j, j in zip(alpha, subset) if a_j > 0)
 
-        # Update weights; mark indices to drop (weight hits zero)
-        dropped = []
+        # Update weights; update index
+        remove = []
         for aj, j in zip(alpha, subset):
             self.c_[j] -= t * aj
             if self.c_[j] <= self.tol:
-                self.alive[j] = False
                 self.c_[j] = 0.
-        #         if self.alive[j]:
-        #             self.alive[j] = False
-        #             dropped.append(j)
-        #             self.c_[j] = 0.0
-
-        # self.removed_total += len(dropped)
-        # active_count -= len(dropped)
+                remove.append(j)
+        self.alive_idx = self.alive_idx[~np.isin(self.alive_idx, remove)]
+        self.index.remove_ids(np.array(remove, dtype='int64'))
 
 
     # ------------------------ Public API ------------------------
-    def compress_weights(self,         k: int,
+    def compress_weights(self,
+        k: int,
         dstop=None,                 # stop when d <= dstop; None means dstop = binom(m+k, k)
         candidate_fraction=0.1,     # fraction of alive points used as candidate centers
-        max_candidates=10000,
-        overquery=2,                # extra neighbors to fetch beyond D+1
-        refine=True,                # apply simple pruning refinement inside candidate cluster
+        max_candidates=5000,
+        overquery=5,                # extra neighbors to fetch beyond D+1
         rebuild_fraction=0.30,      # retrain / rebuild when this fraction of ORIGINAL points removed
-        verbose=False):
+        verbose=False, 
+        return_at=None  # None or list; list ordered from small to large
+        ):
         """
         Execute the Carathéodory peeling until the active set size ≤ dstop.
         Returns
@@ -279,7 +190,12 @@ class Compressor:
         c_ : np.ndarray, shape (N,)
             Positive weights scaled to sum to 1.
         """
-        # Build exponent list and feature dimension D
+        if return_at is not None:
+            outputs = dict()
+            return_list = copy(return_at)
+        if self.index_type == 'ivf':    
+            rebuild_threshold = int((1-rebuild_fraction)*self.d)
+
         self.exps = multi_exponents(self.m, k)
         Nmk = len(self.exps)
 
@@ -292,64 +208,31 @@ class Compressor:
         else:
             dstop = dstop
 
-        active_count = int(np.count_nonzero(self.alive))
+        # main loop
+        while self.alive_idx.size > dstop:
+            best_diam, best_subset = self._find_best_subset(Nmk+1, overquery, candidate_fraction, max_candidates)
+            self._reduce1(best_subset)
 
-        while active_count > dstop:
-            target_size = Nmk + 1
-            best_subset = None
-            best_diam = np.inf
-
-            candidates = self._choose_candidate_centers()
-            for cidx in candidates:
-                neigh = self._center_neighbors(cidx, target_size + self.overquery if self.refine else target_size)
-                if neigh.size < target_size:
-                    continue
-                if self.refine and neigh.size > target_size:
-                    neigh = self._refine_prune(neigh, target_size)
-                diam_val = self._diameter(neigh)
-                if diam_val < best_diam:
-                    best_diam = diam_val
-                    best_subset = neigh
-
-            if best_subset is None:
-                raise RuntimeError("Failed to find a viable subset of size D+1 among alive points.")
-
-            # Build D x (D+1) moment matrix for best_subset
-            A = np.empty((Nmk, target_size), dtype=float)
-            for col, j in enumerate(best_subset):
-                A[:, col] = all_moments(self.w_[j], self.exps)
-
-            # Null-space direction
-            alpha = null_space(A, rcond=self.self.tol)[:, 0]
-            if not np.any(alpha > 0):
-                alpha = -alpha
-
-            # Determine maximal step t
-            t = min((self.c_[j] / a_j) for a_j, j in zip(alpha, best_subset) if a_j > 0)
-
-            # Update weights; mark indices to drop (weight hits zero)
-            dropped = []
-            for a_j, j in zip(alpha, best_subset):
-                self.c_[j] -= t * a_j
-                if self.c_[j] <= self.self.tol:
-                    if self.alive[j]:
-                        self.alive[j] = False
-                        dropped.append(j)
-                        self.c_[j] = 0.0
-
-            self.removed_total += len(dropped)
-            active_count -= len(dropped)
+            if return_at is not None:
+                if self.alive_idx.size <= return_list[-1]:
+                    outputs[self.alive_idx.size] = self.c_.copy()
+                    return_list.pop()
 
             if verbose:
-                print(f"diameter={best_diam:.4e}, dropped={len(dropped)}, active={active_count}")
+                print(f"diameter={best_diam:.4e}, #alive={self.alive_idx.size}")
 
-            # Rebuild if enough removals accumulated (IVF primarily; Flat optional)
-            if (self.index_type == 'ivf' or self.verbose) and self.removed_total >= self.next_rebuild_threshold:
-                self._rebuild_if_needed()
+            # Rebuild if enough removals accumulated (IVF only)
+            if self.index_type == 'ivf' and self.alive_idx.size <= rebuild_threshold:
+                self.index = self._build_ivf_index()
+                rebuild_threshold -= int(rebuild_fraction * self.d)
+        
+        if return_at is not None:
+            return outputs
 
-        # Collect final support
-        final_idx = [j for j in range(self.d) if self.alive[j] and self.c_[j] > self.tol]
-        c_ = np.array([self.c_[j] * self.d for j in final_idx], dtype=float)
-        w_final = self.w_[final_idx, :].copy()
-        return c_, w_final
+
+    def compress(self, k: int, **kwargs):
+        self.compress_weights(k, **kwargs)
+        c_ = self.c_[self.alive_idx].copy()
+        w_ = self.w_[self.alive_idx, :].copy()
+        return c_, w_
 
