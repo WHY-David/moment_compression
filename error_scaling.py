@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp
-from moment_matching import compress, compress_naive
+# from moment_matching import compress, compress_naive
+from compressor import Compressor
 
 # sigmoid function
 def sigmoid(z):
@@ -52,14 +53,14 @@ def f_weighted(c, W, num_samples: int = 100, seed: int = 0) -> float:
 
 
 # parameters
-m = 1   # dimension of each point
-d_list = [100, 200, 400, 800, 1600, 3200, 6400]
+m = 2   # dimension of each point
+d_list = [100, 200, 400, 800, 1600, 3200]
 trials_per_d = 10
 num_samples = 10
 seed_data = 0
 seed_f = 42
 k_list = [1, 2, 3, 4]
-filename = 'figures/const_m1.pdf'
+filename = 'figures/linear_m2.pdf'
 
 
 # initialize results dict: results[k][d] = list of errors
@@ -69,16 +70,17 @@ results = {k: {d: [] for d in d_list} for k in k_list}
 # determine the final data set size
 def dstop(d):
     # return int(3.5*d**0.5)
-    # return int(0.35*d)
-    return 35
+    return int(0.35*d)
+    # return 35
 
 def run_trial(args):
     k, d, t = args
     rng = np.random.default_rng(seed_data + t)
     data = rng.random((d, m))
     orig = f(data, num_samples=num_samples, seed=seed_f)
-    c, W = compress(data, k, dstop = dstop(d), index_type='flat')
-    # c, W = compress_naive(data, k, dstop=dstop(d))
+    # c, W = compress(data, k, dstop = dstop(d), index_type='flat')
+    worker = Compressor(data)
+    c, W = worker.compress(k, dstop = dstop(d))
     comp = f_weighted(c, W, num_samples=num_samples, seed=seed_f)
     return k, d, abs(comp - orig)
 
@@ -128,8 +130,8 @@ if __name__ == "__main__":
     plt.yscale('log')
     plt.xlabel(r"Data set size $d$")
     plt.ylabel(r"$|f_{\mathrm{comp}} - f_{\mathrm{orig}}|$")
-    plt.title(r"Compression: $d \to 35$. "+f"Data dimension m={m}")
+    plt.title(r"Compression: $d \to 0.35d$. "+f"Data dimension m={m}")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
+    # plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()

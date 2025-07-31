@@ -45,7 +45,7 @@ class Compressor:
         c_, w_ = comp.run()
     """
     def __init__(self, data, weights=None, tol=1e-12, random_state=0, index_type='flat'):
-        self.w_ = np.asarray(data, dtype=np.float32)
+        self.w_ = np.asarray(data, dtype=float)
         if self.w_.ndim != 2:
             raise ValueError("`data` must be a 2D array of shape (d, m)")
         self.d, self.m = self.w_.shape
@@ -65,7 +65,7 @@ class Compressor:
         if index_type == 'flat':
             self.index = faiss.IndexFlatL2(self.m)
             self.index = faiss.IndexIDMap2(self.index)
-            self.index.add_with_ids(self.w_[self.alive_idx], self.alive_idx)
+            self.index.add_with_ids(self.w_[self.alive_idx].astype(np.float32), self.alive_idx)
         elif index_type == 'ivf':
             self.index = self._build_ivf_index()
         else:
@@ -82,13 +82,13 @@ class Compressor:
         index = faiss.IndexFlatL2(self.m)
         index = faiss.IndexIVFFlat(index, self.m, _nlist, faiss.METRIC_L2)
         if self.alive_idx.size <= _max_sample:
-            index.train(self.w_[self.alive_idx])
+            index.train(self.w_[self.alive_idx].astype(np.float32))
         else:
             sample_idx = self.rng.choice(self.alive_idx, size=_max_sample, replace=False)
-            index.train(self.w_[sample_idx])
+            index.train(self.w_[sample_idx].astype(np.float32))
 
         index = faiss.IndexIDMap2(index)
-        index.add_with_ids(self.w_[self.alive_idx], self.alive_idx)
+        index.add_with_ids(self.w_[self.alive_idx].astype(np.float32), self.alive_idx)
         index.nprobe = _nprobe
         return index
 
