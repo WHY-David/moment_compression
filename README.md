@@ -11,7 +11,7 @@ conda install -c pytorch faiss-cpu
 
 ## How to
 
-- `compressor.py` use the following code to implement data compression
+- `compressor.py` use the following code to implement data compression. IVF index is faster starting from $d\sim 10^7$. Note that Compressor has a fixed rng seed by default. 
 ```python
 from compressor import Compressor
 
