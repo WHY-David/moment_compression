@@ -3,34 +3,20 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
-from compressor import Compressor
-
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
+
+from common import TwoLayerNet
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
+from compressor import Compressor
 
 def generate_data(d, seed=0, noise=0.):
     np.random.seed(seed)
     data_x = np.random.rand(d,1)
     data = np.hstack([data_x, np.sin(2*np.pi*data_x)+noise*np.random.randn(d,1)])  # shape (d, 2)
     return data
-
-
-
-
-
-
-# model: input → hidden Tanh → output
-class TwoLayerNet(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
-        super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.tanh = nn.Tanh()
-        self.fc2 = nn.Linear(hidden_dim, 1)
-    def forward(self, x):
-        return self.fc2(self.tanh(self.fc1(x)))
     
 
 

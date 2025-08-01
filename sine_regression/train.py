@@ -5,17 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 
-
-# model: input → hidden Tanh → output
-class TwoLayerNet(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
-        super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.tanh = nn.Tanh()
-        self.fc2 = nn.Linear(hidden_dim, 1)
-    def forward(self, x):
-        return self.fc2(self.tanh(self.fc1(x)))
-    
+from common import TwoLayerNet, load_data
 
 
 if __name__ == '__main__':
@@ -23,26 +13,24 @@ if __name__ == '__main__':
     device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 
     # hyperparams
-    hidden_dim = 100
+    hidden_dim = 5000
     lr = 1e-2
     batch_size = 64
     epochs = 1000
 
     # data
-    data = np.loadtxt('noisy_sin_10000.csv', delimiter=',')
-    x = torch.from_numpy(data[:, [0]]).float().to(device)
-    y = torch.from_numpy(data[:, [1]]).float().to(device)
+    dataset = load_data()
     # uniform weights
-    weights = torch.ones(len(x), device='cpu')
+    weights = torch.ones(len(dataset), device='cpu')
     # draw len(weights) indices *with replacement* according to weights
     sampler = torch.utils.data.WeightedRandomSampler(
         weights,          # uniform weights
-        num_samples=len(data),
+        num_samples=len(dataset),
         replacement=True  # True allows repeats within a batch
     )
 
     loader = DataLoader(
-        TensorDataset(x, y),
+        dataset,
         batch_size=batch_size,
         sampler=sampler,  # sampler OR shuffle, not both
         num_workers=0,    # optional
@@ -85,6 +73,7 @@ if __name__ == '__main__':
         plt.figure()
         plt.plot(x_plot, y_true, 'g--', label='sin(2πx)')
         plt.plot(x_plot, y_pred_np, color='orange', label='NN prediction')
+        x, y = dataset.tensors
         plt.scatter(x.cpu().numpy().squeeze(), y.cpu().numpy().squeeze(), s=10, alpha=0.3, label='Original training data')
 
         plt.xlabel('x')
