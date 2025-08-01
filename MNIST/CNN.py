@@ -6,10 +6,56 @@ from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 import numpy as np
 
+def compute_loss(net, loader, loss_fn):
+    net.eval()
+    total_loss = 0.0
+    with torch.no_grad():
+        for images, labels in loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = net(images)
+            loss = loss_fn(outputs, labels)
+            total_loss += loss.item() * images.size(0)
+    return total_loss / len(loader.dataset)
+
+def compute_accuracy(net, loader):
+    net.eval()
+    correct, total = 0, 0
+    with torch.no_grad():
+        for images, labels in loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = net(images)
+            _, preds = torch.max(outputs, 1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+    return correct / total
+
+def show_examples():
+    # 6. Show some example predictions
+    n_examples = 10
+    examples = []
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = net(images)
+            _, preds = torch.max(outputs, 1)
+            for i in range(n_examples):
+                examples.append((images[i].cpu().squeeze().numpy(), preds[i].cpu().item(), labels[i].cpu().item()))
+            break
+
+    plt.figure(figsize=(15, 6))
+    for idx, (img, pred, true) in enumerate(examples):
+        plt.subplot(2, 5, idx+1)
+        plt.imshow(img, cmap='gray')
+        plt.title(f"Prediction: {pred}\nTruth: {true}")
+        plt.axis('off')
+    plt.suptitle('Sample MNIST Predictions')
+    plt.tight_layout()
+    plt.show()
+
 # 1. Hyperparameters
-epochs = 5
+epochs = 10
 batch_size = 64
-learning_rate = 1e-3
+learning_rate = 1e-4
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 
 # 2. Data loaders
@@ -48,10 +94,13 @@ class CNN(nn.Module):
         return x
 
 net = CNN().to(device)
-criterion = nn.CrossEntropyLoss()
+loss_fn = nn.CrossEntropyLoss()
 optimizer = optim.Adam(net.parameters(), lr=learning_rate)
 
-# 4. Training loop
+train_losses = []
+test_accuracies = []
+
+# Training loop
 for epoch in range(1, epochs+1):
     net.train()
     total_loss = 0
@@ -59,45 +108,28 @@ for epoch in range(1, epochs+1):
         images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = net(images)
-        loss = criterion(outputs, labels)
+        loss = loss_fn(outputs, labels)
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * images.size(0)
     avg_loss = total_loss / len(train_ds)
     print(f"Epoch {epoch}/{epochs}, Loss: {avg_loss:.4f}")
+    train_losses.append(avg_loss)
+    test_acc = compute_accuracy(net, test_loader)
+    test_accuracies.append(test_acc)
+    print(f"  Test Accuracy: {test_acc:.3f}")
 
-# 5. Evaluation and example predictions
-net.eval()
-correct = 0
-total = 0
-with torch.no_grad():
-    for images, labels in test_loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = net(images)
-        _, preds = torch.max(outputs, 1)
-        correct += (preds == labels).sum().item()
-        total += labels.size(0)
-acc = correct / total * 100
-print(f"Test Accuracy: {acc:.2f}%")
-
-# 6. Show some example predictions
-n_examples = 10
-examples = []
-with torch.no_grad():
-    for images, labels in test_loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = net(images)
-        _, preds = torch.max(outputs, 1)
-        for i in range(n_examples):
-            examples.append((images[i].cpu().squeeze().numpy(), preds[i].cpu().item(), labels[i].cpu().item()))
-        break
-
-plt.figure(figsize=(15, 6))
-for idx, (img, pred, true) in enumerate(examples):
-    plt.subplot(2, 5, idx+1)
-    plt.imshow(img, cmap='gray')
-    plt.title(f"Prediction: {pred}\nTruth: {true}")
-    plt.axis('off')
-plt.suptitle('Sample MNIST Predictions')
+# Plot training loss and test accuracy vs. epoch
+epochs_range = list(range(1, epochs+1))
+fig, axs = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+axs[0].plot(epochs_range, train_losses, marker='o', label='Training Loss')
+axs[0].set_ylabel('Loss')
+axs[0].grid(True)
+axs[0].legend()
+axs[1].plot(epochs_range, test_accuracies, marker='o', label='Test Accuracy')
+axs[1].set_xlabel('Epoch')
+axs[1].set_ylabel('Accuracy')
+axs[1].grid(True)
+axs[1].legend()
 plt.tight_layout()
 plt.show()

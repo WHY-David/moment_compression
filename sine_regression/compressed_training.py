@@ -3,29 +3,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from matplotlib import pyplot as plt
+plt.rc('font', family='Helvetica', size=8)
 
 from common import TwoLayerNet, WeightedTwoLayerNet, compress_nn, fix_random_seed, load_data
 
 # Device configuration
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
-
-
-# def load_model(model_path='sine_model.pth', hidden_dim=1000):
-#     """
-#     Loads the trained TwoLayerNet for sin(2πx) regression.
-    
-#     Args:
-#         model_path (str): Path to the .pth file.
-#         hidden_dim (int): Width of the hidden layer (should match training).
-#     Returns:
-#         model (nn.Module): Loaded model in eval mode.
-#     """
-#     model = TwoLayerNet(input_dim=1, hidden_dim=hidden_dim).to(device)
-#     state = torch.load(model_path, map_location=device)
-#     model.load_state_dict(state)
-#     model.eval()
-#     return model
-
 
 
 def make_loader(dataset, batch_size=64, seed=0):
@@ -55,7 +38,7 @@ def train_orig(net, dataset, epochs=5, batch_size=64, lr=0.01, seed=0, algo=torc
             loss.backward()
             opt.step()
         snapshots.append(net.clone())
-        if (epoch+1)%100 == 0:
+        if (epoch+1)%20 == 0:
             print(f"Epoch {epoch+1}/{epochs} completed")
     return snapshots
 
@@ -93,7 +76,7 @@ def train_weighted(net_w: WeightedTwoLayerNet, weights_t: torch.Tensor,
             loss.backward()
             opt.step()
         snapshots.append(net_w.clone())
-        if (epoch+1)%100 == 0:
+        if (epoch+1)%20 == 0:
             print(f"Epoch {epoch+1}/{epochs} completed")
     return snapshots
 
@@ -135,6 +118,17 @@ def pred(net, x=0.618):
     with torch.no_grad():
         # return torch.abs(net1(xt)-net2(xt)).item()
         return net(xt).item()
+    
+def calculate_MSE(net):
+    criterion = nn.MSELoss()
+    loader = make_loader(dataset, batch_size=batch_size, seed=seed)
+    total_loss, cnt = 0.0, 0
+    with torch.no_grad():
+        for x_e, y_e in loader:
+            preds = net(x_e.to(device))
+            total_loss += criterion(preds, y_e.to(device)).item()
+            cnt += 1
+    return total_loss / cnt
 
 
 if __name__ == '__main__':
@@ -147,12 +141,12 @@ if __name__ == '__main__':
     dstop = 200
     k = 3
     tol = 1e-12
-    lr = 0.01
-    epochs = 10
+    lr = 0.0001
+    epochs = 50
     batch_size = 64
     algo = torch.optim.Adam
 
-    # Data
+    # TensorDataset
     dataset = load_data()
 
     # 1) Original network
@@ -169,33 +163,47 @@ if __name__ == '__main__':
     snaps_orig = train_orig(net_orig, dataset, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
     snaps_cp   = train_weighted(net_cp, weights_t, dataset, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
 
+    losses_naive = [calculate_MSE(net) for net in snaps_naive]
+    losses_orig  = [calculate_MSE(net) for net in snaps_orig]
+    losses_cp    = [calculate_MSE(net) for net in snaps_cp]
+
     # 4) Compare predictions per epoch
     diffs = [pred_dif(s_o, s_c, n=20) for s_o, s_c in zip(snaps_orig, snaps_cp)]
     pred1 = [pred(net) for net in snaps_orig]
     pred2 = [pred(net) for net in snaps_cp]
     pred_naive = [pred(net) for net in snaps_naive]
 
-    # 5) Plot: two subplots
-    fig, axs = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+    # 5) Plot: three subplots
+    fig, axs = plt.subplots(3, 1, figsize=(6, 6), sharex=True)
+    # ensure Helvetica font at size 8 for all ticks
+    for ax in axs:
+        ax.tick_params(axis='both', which='major', labelsize=8)
 
-    # Upper: predictions at x=0.618
-    axs[0].plot(range(0, epochs + 1), pred_naive, marker='d', label=f'Naively prune to dstop')
-    axs[0].plot(range(0, epochs + 1), pred1, marker='o', label=f'd={d} original dynamics')
-    axs[0].plot(range(0, epochs + 1), pred2, marker='^', label=f'dstop={dstop} compressed dynamics')
-    axs[0].set_ylabel('prediction at x=0.618')
-    axs[0].set_title('Prediction vs. epoch')
+    # Plot MSE Loss vs. epoch (log scale)
+    axs[0].plot(range(0, epochs + 1), losses_naive, color='tab:blue',  marker='d', markersize=6, label=f'Naive d\'={dstop}')
+    axs[0].plot(range(0, epochs + 1), losses_orig,  color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
+    axs[0].plot(range(0, epochs + 1), losses_cp,    color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
+    axs[0].set_ylabel('MSE Loss')
+    axs[0].set_yscale('log')
     axs[0].grid(True, linewidth=0.25)
     axs[0].legend()
 
-    # Lower: pred_dif vs epoch
-    axs[1].plot(range(0, epochs + 1), diffs, marker='s', color='tab:red')
-    axs[1].set_xlabel('Epoch')
-    axs[1].set_ylabel(r'$\max_x |NN_{orig}(x) - NN_{comp}(x)|$')
-    # axs[1].set_title('Prediction difference vs. epoch')
+    # Predictions at x=0.618
+    axs[1].plot(range(0, epochs + 1), pred_naive, color='tab:blue',  marker='d', markersize=6, label=f'Naive d\'={dstop}')
+    axs[1].plot(range(0, epochs + 1), pred1,      color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
+    axs[1].plot(range(0, epochs + 1), pred2,      color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
+    axs[1].set_ylabel('prediction at x=0.618')
     axs[1].grid(True, linewidth=0.25)
+    axs[1].legend()
+
+    # Lower: pred_dif vs epoch
+    axs[2].plot(range(0, epochs + 1), diffs, color='tab:red', marker='s', markersize=6)
+    axs[2].set_xlabel('Epoch')
+    axs[2].set_ylabel(r'$\max_x |NN_{orig}(x) - NN_{comp}(x)|$')
+    axs[2].grid(True, linewidth=0.25)
 
     plt.tight_layout()
-    # plt.savefig('training_relu_sgd.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
+    plt.savefig('training_relu_adam.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()
 
 '''
