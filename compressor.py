@@ -39,10 +39,6 @@ def all_moments(w, exps):
 class Compressor:
     """
     Moment compression with diameter-aware Carathéodory peeling.
-
-    Usage:
-        comp = Compressor(data, k, ...)
-        c_, w_ = comp.run()
     """
     def __init__(self, data, weights=None, tol=1e-12, random_state=0, index_type='flat'):
         self.w_ = np.asarray(data, dtype=float)
@@ -155,7 +151,7 @@ class Compressor:
                 best_diam = diam
                 best_subset = subset
 
-        if best_subset is None or self.alive.size <= 20000:
+        if best_subset is None:
             if self.index_type == 'ivf':
                 print("[fallback] IVF search failed to find a viable subset; switching to Flat (IndexFlatL2) and retrying once.")
                 self.index_type = 'flat'
@@ -207,7 +203,7 @@ class Compressor:
         rebuild_interval: int=2,      # retrain / rebuild when this fraction of ORIGINAL points removed
         verbose: bool=False, 
         return_at=None  # None or list; list ordered from small to large
-        ):
+        ) -> None | dict:
         """
         Execute the Carathéodory peeling until the active set size ≤ dstop.
         Returns
@@ -217,7 +213,7 @@ class Compressor:
         """
         if return_at is not None:
             outputs = dict()
-            return_list = copy(return_at)
+            return_list = list(return_at)
         if self.index_type == 'ivf':    
             rebuild_threshold = self.d-rebuild_interval
 
@@ -245,11 +241,18 @@ class Compressor:
 
             if verbose:
                 print(f"diameter={best_diam:.4e}, #alive={self.alive.size}")
-
-            # Rebuild if enough removals accumulated (IVF only)
-            if self.index_type == 'ivf' and self.alive.size <= rebuild_threshold:
-                self.index = self._build_ivf_index()
-                rebuild_threshold -= rebuild_interval
+            
+            if self.index_type == 'ivf':
+                # switch to flat when alive becomes small
+                if self.alive.size <= 20000:
+                    self.index_type = 'flat'
+                    self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
+                    self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
+                    continue
+                # Rebuild if enough removals accumulated (IVF only)
+                if self.alive.size <= rebuild_threshold:
+                    self.index = self._build_ivf_index()
+                    rebuild_threshold -= rebuild_interval
         
         if return_at is not None:
             return outputs
