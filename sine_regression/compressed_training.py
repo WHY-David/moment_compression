@@ -15,21 +15,40 @@ from compressor import Compressor
 # Device configuration
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 
-# model: input → hidden Tanh → output
 class TwoLayerNet(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.tanh = nn.Tanh()
+        self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, 1)
     def forward(self, x):
-        return self.fc2(self.tanh(self.fc1(x)))
+        return self.fc2(self.relu(self.fc1(x)))
+
+    def clone(self):
+        """Return a deep copy of this TwoLayerNet without consuming RNG."""
+        # Dimensions
+        input_dim = self.fc1.weight.shape[1]
+        hidden_dim = self.fc1.weight.shape[0]
+        # Temporarily disable random init for Linear
+        orig_reset = nn.Linear.reset_parameters
+        nn.Linear.reset_parameters = lambda self, *args, **kwargs: None
+        # Instantiate on same device
+        new_net = TwoLayerNet(input_dim, hidden_dim).to(self.fc1.weight.device)
+        # Restore init method
+        nn.Linear.reset_parameters = orig_reset
+        # Copy parameters exactly
+        with torch.no_grad():
+            new_net.fc1.weight.copy_(self.fc1.weight)
+            new_net.fc1.bias.copy_(self.fc1.bias)
+            new_net.fc2.weight.copy_(self.fc2.weight)
+            new_net.fc2.bias.copy_(self.fc2.bias)
+        return new_net
     
 class WeightedTwoLayerNet(nn.Module):
     def __init__(self, input_dim, hidden_dim, weights=None):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.tanh = nn.Tanh()
+        self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, 1)
         # weights is a non-trainable multiplicative mask/scaling per hidden unit
         if weights is None:
@@ -41,9 +60,29 @@ class WeightedTwoLayerNet(nn.Module):
         self.register_buffer('weights', w.view(-1))
 
     def forward(self, x):
-        h = self.tanh(self.fc1(x))                 # (batch, d)
+        h = self.relu(self.fc1(x))                 # (batch, d)
         h = h * self.weights.view(1, -1)           # elementwise scale by c_j
         return self.fc2(h)
+
+    def clone(self):
+        """Return a deep copy of this WeightedTwoLayerNet without consuming RNG."""
+        # Dimensions and buffer
+        input_dim = self.fc1.weight.shape[1]
+        hidden_dim = self.fc1.weight.shape[0]
+        weights_buf = self.weights.detach().clone()
+        # Disable random init for Linear
+        orig_reset = nn.Linear.reset_parameters
+        nn.Linear.reset_parameters = lambda self, *args, **kwargs: None
+        new_net = WeightedTwoLayerNet(input_dim, hidden_dim, weights=weights_buf).to(self.fc1.weight.device)
+        nn.Linear.reset_parameters = orig_reset
+        # Copy parameters and buffer
+        with torch.no_grad():
+            new_net.fc1.weight.copy_(self.fc1.weight)
+            new_net.fc1.bias.copy_(self.fc1.bias)
+            new_net.fc2.weight.copy_(self.fc2.weight)
+            new_net.fc2.bias.copy_(self.fc2.bias)
+            new_net.weights.copy_(self.weights)
+        return new_net
 
 
 def fix_random_seed(seed=0):
@@ -102,15 +141,13 @@ def extract(net: TwoLayerNet):
     # fc1: weight shape (d,1), bias shape (d,)
     # fc2: weight shape (1,d), bias scalar
     with torch.no_grad():
-        W2 = net.fc2.weight.data.cpu().numpy().reshape(-1)  # shape (d,)
         W1 = net.fc1.weight.data.cpu().numpy().reshape(-1)  # shape (d,)
         b1 = net.fc1.bias.data.cpu().numpy()               # shape (d,)
+        W2 = net.fc2.weight.data.cpu().numpy().reshape(-1)  # shape (d,)
         b2 = net.fc2.bias.data.item()
     # Stack into (d, 3)
     w_ = np.stack([W2, W1, b1], axis=1)
     return w_, b2
-
-
 
 
 def compress_nn(net, k=1, dstop=100, tol=1e-12):
@@ -119,20 +156,18 @@ def compress_nn(net, k=1, dstop=100, tol=1e-12):
     WeightedTwoLayerNet that keeps the original width but applies the
     multiplicative weights. Also return the alive indices (c_j > tol).
     """
-    # Extract [a_j, w_j, b_j] from net (shape (d,3))
+    # Extract [W2_j, W1_j, b1_j] from net (shape (d,3))
     w_orig, b2 = extract(net)
     cp = Compressor(w_orig, tol=tol)
-    weights = cp.compress_weights(k, dstop=dstop, return_at=[dstop])[dstop]
+    weights, w_cp = cp.compress(k, dstop=dstop)
 
-    d = w_orig.shape[0]
-    net_cp = WeightedTwoLayerNet(input_dim=1, hidden_dim=d, weights=weights).to(device)
+    net_cp = WeightedTwoLayerNet(input_dim=1, hidden_dim=dstop, weights=weights).to(device)
 
-    # Copy parameters from the original net so both start identically
     with torch.no_grad():
-        net_cp.fc1.weight.copy_(net.fc1.weight)
-        net_cp.fc1.bias.copy_(net.fc1.bias)
-        net_cp.fc2.weight.copy_(net.fc2.weight)
-        net_cp.fc2.bias.copy_(net.fc2.bias)
+        net_cp.fc1.weight.copy_(torch.from_numpy(w_cp[:, 1].astype(np.float32).reshape(-1, 1)).to(device))  # W1
+        net_cp.fc1.bias.copy_(torch.from_numpy(w_cp[:, 2].astype(np.float32)).to(device))                  # b1
+        net_cp.fc2.weight.copy_(torch.from_numpy(w_cp[:, 0].astype(np.float32).reshape(1, -1)).to(device)) # W2
+        net_cp.fc2.bias.copy_(torch.tensor([b2], dtype=torch.float32, device=device))                      # b2
 
     weights_t = torch.as_tensor(weights, dtype=torch.float32, device=device)
     return net_cp, weights_t
@@ -149,55 +184,22 @@ def make_loader(dataset, batch_size=64, seed=0):
     return loader
 
 
-def clone_net(net):
-    """Return a parameter-identical clone of `net` on `device`.
-    Supports TwoLayerNet and WeightedTwoLayerNet.
-    """
-    if isinstance(net, TwoLayerNet):
-        c = TwoLayerNet(input_dim=net.fc1.weight.shape[1],
-                        hidden_dim=net.fc1.weight.shape[0]).to(device)
-        with torch.no_grad():
-            c.fc1.weight.copy_(net.fc1.weight)
-            c.fc1.bias.copy_(net.fc1.bias)
-            c.fc2.weight.copy_(net.fc2.weight)
-            c.fc2.bias.copy_(net.fc2.bias)
-        return c
-
-    if isinstance(net, WeightedTwoLayerNet):
-        input_dim = net.fc1.weight.shape[1]
-        hidden_dim = net.fc1.weight.shape[0]
-        # Preserve the exact per-unit weights (buffer)
-        weights_buf = net.weights.detach().clone()
-        c = WeightedTwoLayerNet(input_dim=input_dim,
-                                hidden_dim=hidden_dim,
-                                weights=weights_buf).to(device)
-        with torch.no_grad():
-            c.fc1.weight.copy_(net.fc1.weight)
-            c.fc1.bias.copy_(net.fc1.bias)
-            c.fc2.weight.copy_(net.fc2.weight)
-            c.fc2.bias.copy_(net.fc2.bias)
-            # Ensure buffer matches exactly
-            c.weights.copy_(net.weights)
-        return c
-
-    raise TypeError(f"clone_net: unsupported network type {type(net)}")
-
 
 def train_orig(net, dataset, epochs=5, batch_size=64, lr=0.01, seed=0):
-    """SGD training of the baseline network. Returns snapshots per epoch (including epoch 0)."""
+    """training of the baseline network. Returns snapshots per epoch (including epoch 0)."""
     fix_random_seed(seed)
     loader = make_loader(dataset, batch_size=batch_size, seed=seed)
     criterion = nn.MSELoss()
     opt = torch.optim.Adam(net.parameters(), lr=lr)
 
-    snapshots = [clone_net(net)]  # epoch 0 (untrained)
+    snapshots = [net.clone()]  # epoch 0 (untrained)
     for epoch in range(epochs):
         for x, y in loader:
             opt.zero_grad()
             loss = criterion(net(x), y)
             loss.backward()
             opt.step()
-        snapshots.append(clone_net(net))
+        snapshots.append(net.clone())
         if (epoch+1)%100 == 0:
             print(f"Epoch {epoch+1}/{epochs} completed")
     return snapshots
@@ -207,7 +209,7 @@ def train_weighted(net_w: WeightedTwoLayerNet, weights_t: torch.Tensor,
                    dataset, epochs=5, batch_size=64, lr=0.01, seed=0):
     """
     Train with the custom rule:
-      - b2 uses standard SGD step
+      - b2 uses standard SGD/Adam step
       - For j in alive: W1_j, W2_j, b1_j use w <- w - (lr / c_j) * grad
       - For j not in alive: no update
     Returns snapshots per epoch (including epoch 0).
@@ -228,14 +230,14 @@ def train_weighted(net_w: WeightedTwoLayerNet, weights_t: torch.Tensor,
 
     opt = torch.optim.Adam(net_w.parameters(), lr=lr)
 
-    snapshots = [clone_net(net_w)]
+    snapshots = [net_w.clone()]
     for epoch in range(epochs):
         for x, y in loader:
             opt.zero_grad()
             loss = criterion(net_w(x), y)
             loss.backward()
             opt.step()
-        snapshots.append(clone_net(net_w))
+        snapshots.append(net_w.clone())
         if (epoch+1)%100 == 0:
             print(f"Epoch {epoch+1}/{epochs} completed")
     return snapshots
@@ -263,11 +265,11 @@ if __name__ == '__main__':
 
     # Hyperparameters
     d = 2000
-    dstop = 1000
-    k = 3
+    dstop = 200
+    k = 4
     tol = 1e-12
     lr = 0.01
-    epochs = 10
+    epochs = 100
     batch_size = 64
 
     # Data
@@ -278,7 +280,8 @@ if __name__ == '__main__':
 
     # 2) Build weighted (compressed) network using Compressor-derived weights
     net_cp, weights_t = compress_nn(net_orig, dstop=dstop, k=k, tol=tol)
-    print(f'Compression completed. d={d}->dstop={dstop}')
+    # print(weights_t.min().item())
+    print(f'Compression completed. d={d} -> dstop={dstop}')
 
     # 3) Train both with identical minibatches/order
     snaps_orig = train_orig(net_orig, dataset, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed)
@@ -290,7 +293,7 @@ if __name__ == '__main__':
     pred2 = [pred(net) for net in snaps_cp]
 
     # 5) Plot: two subplots
-    fig, axs = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
 
     # Upper: predictions at x=0.618
     axs[0].plot(range(0, epochs + 1), pred1, marker='o', label=f'd={d} original dynamics')

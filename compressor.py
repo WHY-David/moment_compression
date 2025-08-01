@@ -226,8 +226,6 @@ class Compressor:
         elif dstop < Nmk:
             warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
             dstop = Nmk
-        else:
-            dstop = dstop
 
         # main loop
         while self.alive.size > dstop:
