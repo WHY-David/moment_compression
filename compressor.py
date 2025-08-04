@@ -213,14 +213,16 @@ class Compressor:
         """
         if return_at is not None:
             outputs = dict()
-            return_list = list(return_at)
-        if self.index_type == 'ivf':    
+            return_list = sorted(list(return_at))
+        if self.index_type == 'ivf':
             rebuild_threshold = self.d-rebuild_interval
 
         self.exps = multi_exponents(self.m, k)
         Nmk = len(self.exps)
 
         # Determine stopping threshold
+        if return_at is not None:
+            dstop = return_list[0]
         if dstop is None:
             dstop = Nmk
         elif dstop < Nmk:
@@ -233,9 +235,9 @@ class Compressor:
             self._reduce1(best_subset)
 
             if return_at is not None:
-                if self.alive.size <= return_list[-1]:
+                if self.alive.size in return_list:
                     outputs[self.alive.size] = self.c_.copy()
-                    return_list.pop()
+                    print(f'Compress progress: {self.alive.size}/{self.d}')
 
             if verbose:
                 print(f"diameter={best_diam:.4e}, #alive={self.alive.size}")

@@ -4,6 +4,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+
 
 # # Import compression
 # from moment_matching import 
@@ -31,90 +35,65 @@ class Autoencoder(nn.Module):
         x_rec = self.decoder(z)
         return x_rec, z
 
-def MNIST_autoencoder(latent_dim = 16, batch_size = 256, epochs = 30, lr = 1e-3):
+def MNIST_autoencoder(latent_dim = 16, batch_size = 256):
+    # Learning rate schedule: list of (lr, num_epochs)
+    schedule = [
+        (0.01, 20),
+        (0.002, 50),
+        (0.001, 50),
+        (0.0002, 100),
+        (0.0001, 200)
+    ]
+    
     transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1))])
     train_ds = datasets.MNIST(root='data', train=True, download=False, transform=transform)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     net = Autoencoder(latent_dim=latent_dim).to(device)
-    optimizer = optim.Adam(net.parameters(), lr=lr)
     criterion = nn.MSELoss()
+    # initialize optimizer with first schedule learning rate
+    optimizer = optim.Adam(net.parameters(), lr=schedule[0][0])
+    total_epochs = sum(ep for _, ep in schedule)
+    losses = []
+    epoch_counter = 0
 
-    # 4. Train Autoencoder
+    # 4. Train Autoencoder with LR schedule
     net.train()
-    for epoch in range(1, epochs+1):
-        epoch_loss = 0.0
-        for xb, _ in train_loader:
-            xb = xb.to(device)
-            optimizer.zero_grad()
-            x_rec, _ = net(xb)
-            loss = criterion(x_rec, xb)
-            loss.backward()
-            optimizer.step()
-            epoch_loss += loss.item() * xb.size(0)
-        epoch_loss /= len(train_ds)
-        print(f"Epoch {epoch}/{epochs}, Loss: {epoch_loss:.6f}")
+    for lr_val, num_epochs in schedule:
+        for g in optimizer.param_groups:
+            g['lr'] = lr_val
+        for _ in range(num_epochs):
+            epoch_counter += 1
+            epoch_loss = 0.0
+            for xb, _ in train_loader:
+                xb = xb.to(device)
+                optimizer.zero_grad()
+                x_rec, _ = net(xb)
+                loss = criterion(x_rec, xb)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item() * xb.size(0)
+            epoch_loss /= len(train_ds)
+            print(f"Epoch {epoch_counter}/{total_epochs}, LR: {lr_val}, Loss: {epoch_loss:.6f}")
+            losses.append(epoch_loss)
 
     net.eval()
-    return net, train_loader
 
+    return net, train_loader, losses
 
-
-
-# draw examples and compare original vs reconstructed
-import matplotlib.pyplot as plt
-
-net, train_loader = MNIST_autoencoder(latent_dim = 32, batch_size = 256, epochs = 30, lr = 1e-2)
-# Switch to eval mode
-net.eval()
-examples = []
-with torch.no_grad():
-    for xb, _ in train_loader:
-        xb = xb.to(device)
-        x_rec, _ = net(xb)
-        examples = [(xb[i].cpu().numpy(), x_rec[i].cpu().numpy()) for i in range(5)]
-        break  # Only need first batch
-
-fig, axes = plt.subplots(2, 5, figsize=(10, 4))
-for i, (orig, recon) in enumerate(examples):
-    axes[0, i].imshow(orig.reshape(28, 28), cmap='gray')
-    axes[0, i].set_title('Original')
-    axes[0, i].axis('off')
-    axes[1, i].imshow(recon.reshape(28, 28), cmap='gray')
-    axes[1, i].set_title('Reconstructed')
-    axes[1, i].axis('off')
-plt.tight_layout()
-plt.show()
-
-# # 5. Extract latent features for entire dataset
-# dev_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=False)
-# latents = []
-# net.eval()
-# with torch.no_grad():
-#     for xb, _ in dev_loader:
-#         xb = xb.to(device)
-#         _, z = net(xb)
-#         latents.append(z.cpu().numpy())
-# latents = np.vstack(latents)  # shape (60000, dim_latent)
-
-# # 6. Compress latent representations to weighted atoms
-# # e.g., match first two moments: k=2
-# c, W = compress(latents, k=2, index_type='ivf', nprobe=16)
-# print("Compressed to", W.shape[0], "atoms in", W.shape[1], "D")
-
-# # c: weights, W: latent atoms
-# # To reconstruct image prototypes, map W through decoder:
-# W_tensor = torch.from_numpy(W).float().to(device)
-# with torch.no_grad():
-#     recs = net.decoder(W_tensor).cpu().numpy()  # shape (dstop, 784)
-# # recs are prototype images
-
-# # 7. Save or visualize prototypes
-# import matplotlib.pyplot as plt
-# fig, axes = plt.subplots(4, 8, figsize=(8,4))
-# for ax, img in zip(axes.flatten(), recs[:32]):
-#     ax.imshow(img.reshape(28,28), cmap='gray')
-#     ax.axis('off')
-# plt.suptitle('Compressed Prototypes via Autoencoder + Moment Matching')
-# plt.tight_layout()
-# plt.show()
+if __name__ == '__main__':
+    # Run training and capture losses
+    net, train_loader, losses = MNIST_autoencoder(latent_dim=16, batch_size=256)
+    # Plot training loss vs. epoch
+    plt.figure()
+    plt.plot(range(1, len(losses)+1), losses, marker='o')
+    plt.xlabel('Epoch')
+    plt.ylabel('MSE Loss')
+    plt.title('Training Loss vs. Epoch')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+    # Save encoder & decoder state
+    save_path = os.path.join(os.path.dirname(__file__), 'autoencoder.pth')
+    torch.save(net.state_dict(), save_path)
+    print(f"Saved autoencoder state_dict to {save_path}")
