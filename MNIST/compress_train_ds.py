@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
 
 from autoencoder import Autoencoder
 
@@ -8,10 +10,8 @@ import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from compressor import Compressor
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
-import os
 
 
 def MNIST_train_loader(batch_size=256):

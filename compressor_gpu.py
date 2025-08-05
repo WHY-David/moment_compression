@@ -1,10 +1,18 @@
 import numpy as np
-import itertools
 from scipy.linalg import null_space
 import faiss
 import warnings
 from copy import copy
 from tqdm import tqdm
+import os
+
+# Try GPU; fall back to CPU automatically
+def _has_cuda():
+    try:
+        _ = faiss.get_num_gpus()
+        return faiss.get_num_gpus() > 0
+    except Exception:
+        return False
 
 def multi_exponents(m, k):
     """
@@ -41,13 +49,14 @@ class Compressor:
     """
     Moment compression with diameter-aware Carathéodory peeling.
     """
-    def __init__(self, data, weights=None, tol=1e-12, random_state=0, index_type='flat'):
+    def __init__(self, data, weights=None, tol=1e-12, random_state=0,
+                 use_gpu=True, gpu_device=0, multi_gpu=False,
+                 rebuild_dead_ratio=0.2, rebuild_dead_min=100_000):
         self.w_ = np.asarray(data, dtype=float)
         if self.w_.ndim != 2:
             raise ValueError("`data` must be a 2D array of shape (d, m)")
         self.d, self.m = self.w_.shape
 
-        self.index_type = index_type
         self.tol = tol
         self.rng = np.random.default_rng(random_state)
 
@@ -58,99 +67,52 @@ class Compressor:
             assert len(self.c_) == self.d   
         self.alive = np.nonzero(self.c_ > self.tol)[0]
 
-        # Build initial index
-        if index_type == 'flat':
-            self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
-            self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-        elif index_type == 'ivf':
-            self.index = self._build_ivf_index()
-        else:
-            raise ValueError("index_type must be 'ivf' or 'flat'.")
+        # alive bookkeeping and rebuild policy
+        self.alive_mask = np.zeros(self.d, dtype=bool)
+        self.alive_mask[self.alive] = True
+        self.removed_since_rebuild = 0
+        self.rebuild_dead_ratio = float(rebuild_dead_ratio)
+        self.rebuild_dead_min = int(rebuild_dead_min)
+
+        # GPU options
+        self.use_gpu = bool(use_gpu)
+        self.gpu_device = int(gpu_device)
+        self.multi_gpu = bool(multi_gpu)
+        self.gpu_res = None  # faiss.StandardGpuResources when on GPU
+
+        # Build initial (Flat) index on CPU, then optionally move to GPU
+        self.index = self._build_flat_index()
 
 
     # # ------------------------ Internal helpers ------------------------
-    # def _build_ivf_index(self):
-    #     """(re)build ivf data from scratch with robust nlist/nprobe and training size"""
-    #     alive_n = int(self.alive.size)
-    #     # choose nlist so avg list occupancy ~100 and satisfy FAISS training rule 39*nlist <= alive_n
-    #     target_occ = 100
-    #     nlist = max(32, min(8192, alive_n // max(1, target_occ)))
-    #     nlist = min(nlist, max(32, alive_n // 39))  # ensure enough train data; shrink nlist if dataset is small
-    #     if nlist < 32:
-    #         nlist = 32
+    def _build_flat_index(self):
+        """(Re)build a FlatL2 index with ID mapping; place on GPU if available/desired.
+        We avoid per-iteration remove_ids on the device by maintaining an alive_mask
+        and rebuilding only when dead fraction is large.
+        """
+        # Base CPU index with ID mapping so we preserve original ids
+        base = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
+        alive_ids = self.alive.copy().astype('int64')
+        base.add_with_ids(np.ascontiguousarray(self.w_[alive_ids].astype(np.float32)), alive_ids)
 
-    #     # build quantizer + IVF
-    #     quant = faiss.IndexFlatL2(self.m)
-    #     ivf = faiss.IndexIVFFlat(quant, self.m, int(nlist), faiss.METRIC_L2)
+        # Track how many vectors are physically in the index (for dead-ratio checks)
+        self._indexed_count = int(alive_ids.size)
+        self.removed_since_rebuild = 0
 
-    #     # training sample: at least min(alive_n, 39*nlist)
-    #     train_sz = min(alive_n, 39 * int(nlist))
-    #     if alive_n <= train_sz:
-    #         train_ids = self.alive
-    #     else:
-    #         train_ids = self.rng.choice(self.alive, size=train_sz, replace=False)
-    #     ivf.train(self.w_[train_ids].astype(np.float32))
-
-    #     # wrap in IDMap2 and add alive vectors/ids
-    #     idmap = faiss.IndexIDMap2(ivf)
-    #     idmap.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-
-    #     # choose nprobe ~3% of nlist (bounded)
-    #     nprobe = max(8, min(1024, int(0.03 * nlist)))
-    #     idmap.index.nprobe = nprobe
-    #     return idmap
-    
-    def _build_ivf_index(self):
-        """(re)build IVF data with tunable nlist/nprobe and richer training size."""
-        alive_n = self.alive.size
-
-        # ---- Tunables (safe defaults for d ~ 1e6 in 3D) ----
-        target_occ      = 100          # desired avg points per list
-        nlist_min       = 64           # allow a bit larger floor than 32 when data is big
-        nlist_max       = 32768        # raise cap so 1e6 points can use small cells
-        train_mult_min  = 50           # try to train with >= 50 * nlist points when available
-        train_mult_cap  = 80           # don't exceed 80 * nlist (diminishing returns)
-        nprobe_frac     = 0.03         # baseline nprobe as a fraction of nlist
-        nprobe_min      = 16
-        nprobe_max      = 1024         # hard cap to keep searches fast
-
-        # ---- Choose nlist ----
-        # primary: target per-list occupancy
-        nlist_occ = max(1, alive_n // max(1, target_occ))
-        # training rule: need >= 39 * nlist training points
-        nlist_train = max(1, alive_n // 39)
-        nlist = int(min(max(nlist_min, nlist_occ, nlist_train), nlist_max))
-
-        # ---- Build quantizer + IVF ----
-        quant = faiss.IndexFlatL2(self.m)
-        ivf = faiss.IndexIVFFlat(quant, self.m, nlist, faiss.METRIC_L2)
-
-        # ---- Training set size (richer than bare minimum) ----
-        desired = int(min(train_mult_cap * nlist, alive_n))
-        lower   = int(min(train_mult_min * nlist, alive_n))
-        train_sz = max(lower, min(desired, alive_n))
-        if alive_n <= train_sz:
-            train_ids = self.alive
-        else:
-            train_ids = self.rng.choice(self.alive, size=train_sz, replace=False)
-
-        ivf.train(self.w_[train_ids].astype(np.float32))
-
-        # ---- Add all alive vectors with IDs ----
-        idmap = faiss.IndexIDMap2(ivf)
-        idmap.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-
-        # ---- Baseline nprobe; store for adaptive search ----
-        base_nprobe = int(max(nprobe_min, min(nprobe_max, nprobe_frac * nlist)))
-        base_nprobe = int(min(base_nprobe, nlist))  # cannot exceed nlist
-        idmap.index.nprobe = base_nprobe
-
-        # remember for adaptive probing logic elsewhere
-        self.nprobe_base = base_nprobe
-        self.nlist_current = nlist
-
-        return idmap
-
+        # GPU placement (optional)
+        place_on_gpu = self.use_gpu and _has_cuda()
+        if place_on_gpu:
+            try:
+                if self.multi_gpu:
+                    idx = faiss.index_cpu_to_all_gpus(base)
+                else:
+                    if self.gpu_res is None:
+                        self.gpu_res = faiss.StandardGpuResources()
+                    idx = faiss.index_cpu_to_gpu(self.gpu_res, self.gpu_device, base)
+                return idx
+            except Exception as e:
+                warnings.warn(f"FAISS GPU unavailable or failed ({e}); falling back to CPU.")
+        return base
 
     def _diameter(self, idx_subset: np.ndarray) -> float:
         Y = self.w_[idx_subset]
@@ -174,6 +136,9 @@ class Compressor:
             del idxs[remove_pos]
         return np.array(idxs, dtype=int)
 
+    def _f32(self, X):
+        return np.ascontiguousarray(X.astype(np.float32))
+
     def _choose_candidate_centers(self, candidate_fraction, max_candidates) -> np.ndarray:
         """Return a random subset of alive original indices to serve as candidate centers."""
         ccount = int(min(max(1, candidate_fraction * self.alive.size), max_candidates))
@@ -190,10 +155,14 @@ class Compressor:
         best_diam = np.inf
 
         candidates = self._choose_candidate_centers(candidate_fraction, max_candidates)
-        center_vecs = self.w_[candidates, :]
+        center_vecs = self._f32(self.w_[candidates, :])
         _, I = self.index.search(center_vecs, n_neigh)
         # If not found, I will be padded by -1. I.shape = nq*m
         for subset in I:
+            # filter out invalid ids and dead points, then refine/prune
+            subset = [int(x) for x in subset if int(x) >= 0 and self.alive_mask[int(x)]]
+            if not subset:
+                continue
             subset = self._refine_prune(subset, target_size)
             if len(subset) < target_size:
                 continue
@@ -203,12 +172,6 @@ class Compressor:
                 best_subset = subset
 
         if best_subset is None:
-            if self.index_type == 'ivf':
-                print("[fallback] IVF search failed to find a viable subset; switching to Flat (IndexFlatL2) and retrying once.")
-                self.index_type = 'flat'
-                self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
-                self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-                return self._find_best_subset(target_size, overquery, candidate_fraction, max_candidates)
             raise RuntimeError(
                 "Failed to find a viable subset of the requested size among alive points; "
             )
@@ -240,8 +203,18 @@ class Compressor:
             if self.c_[j] <= self.tol:
                 self.c_[j] = 0.
                 remove.append(j)
-        self.alive = self.alive[~np.isin(self.alive, remove)]
-        self.index.remove_ids(np.array(remove, dtype='int64'))
+
+        # mark removed in mask and recompute alive list
+        if remove:
+            remove = np.array(remove, dtype=int)
+            self.alive_mask[remove] = False
+            self.alive = np.nonzero(self.alive_mask & (self.c_ > self.tol))[0]
+            self.removed_since_rebuild += int(remove.size)
+
+            # Rebuild the physical index only when too many dead entries accumulate
+            dead_fraction = self.removed_since_rebuild / max(1, self._indexed_count)
+            if (self.removed_since_rebuild >= self.rebuild_dead_min) or (dead_fraction >= self.rebuild_dead_ratio):
+                self.index = self._build_flat_index()
 
 
     # ------------------------ Public API ------------------------
@@ -251,7 +224,6 @@ class Compressor:
         candidate_fraction=0.1,     # fraction of alive points used as candidate centers
         max_candidates: int=5000,
         overquery: int=5,                # extra neighbors to fetch beyond D+1
-        rebuild_interval: int=2,      # retrain / rebuild when this fraction of ORIGINAL points removed
         return_at=None  # None or list; list ordered from small to large
         ) -> None | dict:
         """
@@ -264,8 +236,6 @@ class Compressor:
         if return_at is not None:
             outputs = dict()
             return_list = sorted(list(return_at))
-        if self.index_type == 'ivf':
-            rebuild_threshold = self.d-rebuild_interval
 
         self.exps = multi_exponents(self.m, k)
         Nmk = len(self.exps)
@@ -279,9 +249,9 @@ class Compressor:
             warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
             dstop = Nmk
 
-        # progress bar setup
-        pbar = tqdm(total=self.d, desc="Compressing", unit="pt")
-        prev_alive = self.alive.size
+        # # progress bar setup
+        # pbar = tqdm(total=self.d, desc="Compressing", unit="pt")
+        # prev_alive = self.alive.size
 
         # main loop
         while self.alive.size > dstop:
@@ -292,26 +262,14 @@ class Compressor:
                 if self.alive.size in return_list:
                     outputs[self.alive.size] = self.c_.copy()
                     print(f'Compress progress: {self.alive.size}/{self.d}')
-            
-            if self.index_type == 'ivf':
-                # switch to flat when alive becomes small
-                if self.alive.size <= 50000:
-                    self.index_type = 'flat'
-                    self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
-                    self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-                    continue
-                # Rebuild if enough removals accumulated (IVF only)
-                if self.alive.size <= rebuild_threshold:
-                    self.index = self._build_ivf_index()
-                    rebuild_threshold -= rebuild_interval
 
-            # update progress bar at end of iteration
-            removed = prev_alive - self.alive.size
-            if removed > 0:
-                pbar.update(removed)
-                prev_alive = self.alive.size
-            pbar.set_postfix(best_diam=f"{best_diam:.2e}")
-        pbar.close()
+        #     # update progress bar at end of iteration
+        #     removed = prev_alive - self.alive.size
+        #     if removed > 0:
+        #         pbar.update(removed)
+        #         prev_alive = self.alive.size
+        #     pbar.set_postfix(best_diam=f"{best_diam:.2e}")
+        # pbar.close()
         
         if return_at is not None:
             return outputs
@@ -322,4 +280,3 @@ class Compressor:
         c_ = self.c_[self.alive].copy()
         w_ = self.w_[self.alive, :].copy()
         return c_, w_
-

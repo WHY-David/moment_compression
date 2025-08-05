@@ -117,7 +117,7 @@ def bptrain(loader, epochs, lr):
 
 if __name__ == '__main__':
     # hyperparams
-    epochs = 30
+    epochs = 20
     batch_size = 64
     lr = 1e-4
     seed = 0
@@ -165,7 +165,7 @@ if __name__ == '__main__':
 
     # the naive pruning
     weight = np.zeros(60000, dtype=int)
-    weight[:10000] = 1
+    weight[:d] = 1
     np.random.shuffle(weight)
     loader = weighted_loader(train_ds, weight, batch_size=batch_size)
     fix_random_seed(seed)
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     axs[0].plot(epochs_range, train_losses, marker='o', label=f"Naive prune d={d}")
     axs[1].plot(epochs_range, test_losses, marker='o', label=f"Naive prune d={d}")
 
-        
+    
     # final adjustments to the plot
     axs[0].set_ylabel('Train CE')
     axs[0].grid(True)
@@ -183,5 +183,5 @@ if __name__ == '__main__':
     axs[1].grid(True)
     axs[1].legend()
     plt.tight_layout()
-    plt.savefig("train_on_20000.pdf", format='pdf', bbox_inches='tight', pad_inches=0)
+    plt.savefig("train_on_20000_1.pdf", format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()
