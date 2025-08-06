@@ -51,7 +51,7 @@ class Compressor:
     Moment compression with diameter-aware Carathéodory peeling.
     """
     def __init__(self, data, weights=None, tol=1e-12, random_state=0,
-                 gpu_device=0, multi_gpu=False):
+                 gpu_device=0, multi_gpu=False, index_type='flat'):
         self.w_ = np.asarray(data, dtype=float)
         if self.w_.ndim != 2:
             raise ValueError("`data` must be a 2D array of shape (d, m)")
@@ -59,6 +59,8 @@ class Compressor:
 
         self.tol = tol
         self.rng = np.random.default_rng(random_state)
+
+        self.index_type = index_type
 
         if weights is None:
             self.c_ = np.full(self.d, 1.0)
