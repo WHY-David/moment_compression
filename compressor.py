@@ -291,7 +291,6 @@ class Compressor:
             if return_at is not None:
                 if self.alive.size in return_list:
                     outputs[self.alive.size] = self.c_.copy()
-                    print(f'Compress progress: {self.alive.size}/{self.d}')
             
             if self.index_type == 'ivf':
                 # switch to flat when alive becomes small

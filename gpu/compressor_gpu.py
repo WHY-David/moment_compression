@@ -14,6 +14,7 @@ def _has_cuda():
     except Exception:
         return False
 
+
 def multi_exponents(m, k):
     """
     Generate all exponent-tuples e = (e_0,...,e_{m-1}) of nonnegative
@@ -50,8 +51,7 @@ class Compressor:
     Moment compression with diameter-aware Carathéodory peeling.
     """
     def __init__(self, data, weights=None, tol=1e-12, random_state=0,
-                 use_gpu=True, gpu_device=0, multi_gpu=False,
-                 rebuild_dead_ratio=0.2, rebuild_dead_min=100_000):
+                 gpu_device=0, multi_gpu=False):
         self.w_ = np.asarray(data, dtype=float)
         if self.w_.ndim != 2:
             raise ValueError("`data` must be a 2D array of shape (d, m)")
@@ -64,21 +64,18 @@ class Compressor:
             self.c_ = np.full(self.d, 1.0)
         else:
             self.c_ = np.asarray(weights, dtype=float)
-            assert len(self.c_) == self.d   
+            assert len(self.c_) == self.d
         self.alive = np.nonzero(self.c_ > self.tol)[0]
 
         # alive bookkeeping and rebuild policy
-        self.alive_mask = np.zeros(self.d, dtype=bool)
-        self.alive_mask[self.alive] = True
+        self.alive_mask = self.c_ > self.tol
         self.removed_since_rebuild = 0
-        self.rebuild_dead_ratio = float(rebuild_dead_ratio)
-        self.rebuild_dead_min = int(rebuild_dead_min)
 
         # GPU options
-        self.use_gpu = bool(use_gpu)
+        print(f"Running on {'GPU' if _has_cuda() else 'CPU'}")
         self.gpu_device = int(gpu_device)
         self.multi_gpu = bool(multi_gpu)
-        self.gpu_res = None  # faiss.StandardGpuResources when on GPU
+        self.gpu_res = None
 
         # Build initial (Flat) index on CPU, then optionally move to GPU
         self.index = self._build_flat_index()
@@ -96,18 +93,23 @@ class Compressor:
         base.add_with_ids(np.ascontiguousarray(self.w_[alive_ids].astype(np.float32)), alive_ids)
 
         # Track how many vectors are physically in the index (for dead-ratio checks)
-        self._indexed_count = int(alive_ids.size)
         self.removed_since_rebuild = 0
 
         # GPU placement (optional)
-        place_on_gpu = self.use_gpu and _has_cuda()
+        place_on_gpu = _has_cuda()
         if place_on_gpu:
             try:
+                # Ensure GPU resources are initialized
+                if self.gpu_res is None:
+                    try:
+                        self.gpu_res = faiss.StandardGpuResources()
+                    except AttributeError:
+                        warnings.warn("faiss.StandardGpuResources not available; falling back to CPU index.")
+                        return base
+                # Move base index to GPU
                 if self.multi_gpu:
                     idx = faiss.index_cpu_to_all_gpus(base)
                 else:
-                    if self.gpu_res is None:
-                        self.gpu_res = faiss.StandardGpuResources()
                     idx = faiss.index_cpu_to_gpu(self.gpu_res, self.gpu_device, base)
                 return idx
             except Exception as e:
@@ -121,11 +123,8 @@ class Compressor:
         np.fill_diagonal(D2, 0.0)
         return float(np.sqrt(np.max(D2)))
 
-    def _refine_prune(self, indices, target_size: int) -> np.ndarray:
+    def _refine_prune(self, idxs, target_size: int) -> np.ndarray:
         """Greedy remove the point with largest average distance until the target size is reached."""
-        idxs = [int(x) for x in indices if int(x) >= 0]
-        if len(idxs) <= target_size:
-            return np.array(idxs, dtype=int)
         while len(idxs) > target_size:
             Y = self.w_[idxs]
             norms = np.sum(Y * Y, axis=1, keepdims=True)
@@ -136,48 +135,57 @@ class Compressor:
             del idxs[remove_pos]
         return np.array(idxs, dtype=int)
 
-    def _f32(self, X):
-        return np.ascontiguousarray(X.astype(np.float32))
-
-    def _choose_candidate_centers(self, candidate_fraction, max_candidates) -> np.ndarray:
+    def _choose_candidate_centers(self, candidate_fraction, max_candidates):
         """Return a random subset of alive original indices to serve as candidate centers."""
         ccount = int(min(max(1, candidate_fraction * self.alive.size), max_candidates))
         if ccount >= self.alive.size:
             return self.alive
         return self.rng.choice(self.alive, size=ccount, replace=False)
-    
+
     def _find_best_subset(self, target_size: int, overquery: int, candidate_fraction, max_candidates):
-        n_neigh = target_size + overquery
-        if target_size <= self.alive.size < n_neigh:
-            n_neigh = self.alive.size
+        """
+        Find a size-`target_size` subset with small diameter *among alive vectors only*.
+        Works even with overquery=0 by adaptively increasing k until enough alive ids
+        are available. Caps growth to avoid runaway work.
+        """
+        # Base neighbors and a sane cap to prevent runaway work
+        base_neigh = target_size + overquery
+        # If many IDs are dead, we'll need to look a bit wider; cap at ~16× base or +256
+        max_neigh_cap = min(self.alive.size, max(base_neigh * 16, target_size + 256))
 
         best_subset = None
         best_diam = np.inf
 
+        # Fix candidate centers for this attempt; only grow k
         candidates = self._choose_candidate_centers(candidate_fraction, max_candidates)
-        center_vecs = self._f32(self.w_[candidates, :])
-        _, I = self.index.search(center_vecs, n_neigh)
-        # If not found, I will be padded by -1. I.shape = nq*m
-        for subset in I:
-            # filter out invalid ids and dead points, then refine/prune
-            subset = [int(x) for x in subset if int(x) >= 0 and self.alive_mask[int(x)]]
-            if not subset:
-                continue
-            subset = self._refine_prune(subset, target_size)
-            if len(subset) < target_size:
-                continue
-            diam = self._diameter(subset)
-            if diam < best_diam:
-                best_diam = diam
-                best_subset = subset
+        center_vecs = np.ascontiguousarray(self.w_[candidates, :])
+
+        n_neigh = base_neigh
+        while n_neigh <= max_neigh_cap and best_subset is None:
+            _, I = self.index.search(center_vecs, n_neigh)
+
+            for subset in I:
+                # Keep only valid & ALIVE ids; skip empty/too-short rows
+                # row will contain -1 if not found
+                subset = [x for x in subset if x >= 0 and self.alive_mask[x]]
+                # Prune/refine down to exactly target_size and evaluate
+                subset = self._refine_prune(subset, target_size)
+                if len(subset) < target_size:
+                    continue
+
+                diam = self._diameter(subset)
+                if diam < best_diam:
+                    best_diam = diam
+                    best_subset = subset
+
+            if best_subset is None:
+                # Not enough alive neighbors yet; escalate k (double, with a small linear bump)
+                n_neigh = min(max_neigh_cap, max(n_neigh + 8, n_neigh * 2))
 
         if best_subset is None:
-            raise RuntimeError(
-                "Failed to find a viable subset of the requested size among alive points; "
-            )
-        
+            raise RuntimeError("Failed to find a viable alive subset of the requested size among current points.")
         return best_diam, best_subset
-        
+
     def _reduce1(self, subset):
         '''
         Caratheodory peeling
@@ -209,29 +217,26 @@ class Compressor:
             remove = np.array(remove, dtype=int)
             self.alive_mask[remove] = False
             self.alive = np.nonzero(self.alive_mask & (self.c_ > self.tol))[0]
-            self.removed_since_rebuild += int(remove.size)
-
-            # Rebuild the physical index only when too many dead entries accumulate
-            dead_fraction = self.removed_since_rebuild / max(1, self._indexed_count)
-            if (self.removed_since_rebuild >= self.rebuild_dead_min) or (dead_fraction >= self.rebuild_dead_ratio):
-                self.index = self._build_flat_index()
+            self.removed_since_rebuild += remove.size
 
 
     # ------------------------ Public API ------------------------
     def compress_weights(self,
         k: int,
         dstop=None,                 # stop when d <= dstop; None means dstop = binom(m+k, k)
+        return_at=None,             # None or list
         candidate_fraction=0.1,     # fraction of alive points used as candidate centers
         max_candidates: int=5000,
+        rebuild_dead_ratio=0.2,
+        rebuild_dead_min: int=1000,
         overquery: int=5,                # extra neighbors to fetch beyond D+1
-        return_at=None  # None or list; list ordered from small to large
+        progress_bar=False
         ) -> None | dict:
         """
         Execute the Carathéodory peeling until the active set size ≤ dstop.
         Returns
         -------
-        c_ : np.ndarray, shape (N,)
-            Positive weights scaled to sum to 1.
+        a dictionary of {d: weights} if return_at is assigned; else None
         """
         if return_at is not None:
             outputs = dict()
@@ -249,28 +254,35 @@ class Compressor:
             warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
             dstop = Nmk
 
-        # # progress bar setup
-        # pbar = tqdm(total=self.d, desc="Compressing", unit="pt")
-        # prev_alive = self.alive.size
+        # progress bar setup
+        if progress_bar:
+            pbar = tqdm(total=self.d, desc="Compressing", unit="pt")
+            prev_alive = self.alive.size
 
         # main loop
         while self.alive.size > dstop:
             best_diam, best_subset = self._find_best_subset(Nmk+1, overquery, candidate_fraction, max_candidates)
             self._reduce1(best_subset)
+            # Rebuild the physical index only when too many dead entries accumulate
+            dead_fraction = self.removed_since_rebuild / max(1, self.alive.size)
+            if (self.removed_since_rebuild >= rebuild_dead_min) or (dead_fraction >= rebuild_dead_ratio):
+                self.index = self._build_flat_index()
 
             if return_at is not None:
                 if self.alive.size in return_list:
                     outputs[self.alive.size] = self.c_.copy()
-                    print(f'Compress progress: {self.alive.size}/{self.d}')
+                    # print(f'Compress progress: {self.alive.size}/{self.d}')
 
-        #     # update progress bar at end of iteration
-        #     removed = prev_alive - self.alive.size
-        #     if removed > 0:
-        #         pbar.update(removed)
-        #         prev_alive = self.alive.size
-        #     pbar.set_postfix(best_diam=f"{best_diam:.2e}")
-        # pbar.close()
-        
+            if progress_bar:
+                removed = prev_alive - self.alive.size
+                if removed > 0:
+                    pbar.update(removed)
+                    prev_alive = self.alive.size
+                pbar.set_postfix(best_diam=f"{best_diam:.2e}")
+
+        if progress_bar:
+            pbar.close()
+
         if return_at is not None:
             return outputs
 

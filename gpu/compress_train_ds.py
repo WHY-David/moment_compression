@@ -1,24 +1,19 @@
 import numpy as np
-from data_gen import generate_train_data
 
-import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from compressor import Compressor
+from compressor_gpu import Compressor
 
-# set BLAS/OpenMP threads before libs import
-p = (os.cpu_count() or 8) // 2 or 1
-print(f"p = {p}")
-os.environ.setdefault("OMP_NUM_THREADS", str(p))
-os.environ.setdefault("OPENBLAS_NUM_THREADS", str(p))
-os.environ.setdefault("VECLIB_MAXIMUM_THREADS", str(p))
-os.environ.setdefault("NUMEXPR_MAX_THREADS", str(p))
-os.environ.setdefault("FAISS_NUM_THREADS", str(p))
+def f(x, y):
+    """Compute f(x, y) = exp(sin(pi * x) + y^2)."""
+    return np.exp(np.sin(np.pi * x) + y**2)
 
-import faiss
-try: 
-    faiss.omp_set_num_threads(p)
-except Exception: 
-    print("faiss.omp_set_num_threads(p) failed")
+def generate_train_data(size, func=f, noise=0., seed=0):
+    rng = np.random.default_rng(seed)
+    x = rng.uniform(-1, 1, size)
+    y = rng.uniform(-1, 1, size)
+    fv = func(x, y)
+    noise_vals = rng.normal(loc=0.0, scale=noise, size=size)
+    fv_noisy = fv + noise_vals
+    return np.column_stack((x, y, fv_noisy))
 
 
 
