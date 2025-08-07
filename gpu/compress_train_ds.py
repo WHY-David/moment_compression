@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     seed = 0
     d = 100_000
-    k = 1
+    k = 3
     print(f"k = {k}")
 
     train_ds = generate_train_data(d, noise=0.5, seed=seed)
