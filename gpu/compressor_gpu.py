@@ -4,7 +4,7 @@ import faiss
 import warnings
 from copy import copy
 from tqdm import tqdm
-import os
+import torch
 
 # Try GPU; fall back to CPU automatically
 def _has_cuda():
@@ -44,6 +44,26 @@ def multi_exponents(m, k):
 # compute the moment‐feature vector of a single point
 def all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
+
+def null_space_gpu(A, rcond=1e-12, device='cuda'):
+    # move data to torch
+    X = torch.from_numpy(A).to(device=device, dtype=torch.float64)
+
+    U, S, Vh = torch.linalg.svd(X, full_matrices=True)
+
+    # determine tolerance
+    tol = rcond * S.max()
+
+    # number of non-zero singular values = rank
+    rank = int((S > tol).sum().item())
+    nullity = Vh.shape[0] - rank
+    if nullity <= 0:
+        # no null space
+        return np.zeros((A.shape[1], 0))
+
+    # null space basis = last `nullity` rows of Vh, transposed to shape (n, nullity)
+    Z = Vh[rank:, :].T
+    return Z.cpu().numpy()
 
 
 class Compressor:
@@ -225,7 +245,7 @@ class Compressor:
     # ------------------------ Public API ------------------------
     def compress_weights(self,
         k: int,
-        dstop=None,                 # stop when d <= dstop; None means dstop = binom(m+k, k)
+        dstop=None,                 # stop when d <= dstop; None means binom(m+k, k)
         return_at=None,             # None or list
         candidate_fraction=0.1,     # fraction of alive points used as candidate centers
         max_candidates: int=5000,
