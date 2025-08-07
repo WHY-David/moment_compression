@@ -261,7 +261,7 @@ class Compressor:
         candidate_fraction=0.1,     # fraction of alive points used as candidate centers
         max_candidates: int=5000,
         rebuild_dead_ratio=0.2,
-        rebuild_dead_min: int=1000,
+        rebuild_dead_min: int=2000,
         overquery: int=5,                # extra neighbors to fetch beyond D+1
         progress_bar=False, 
         print_progress=True
@@ -301,8 +301,7 @@ class Compressor:
             best_diam, best_subset = self._find_best_subset(Nmk+1, overquery, candidate_fraction, max_candidates)
             self._reduce1(best_subset)
             # Rebuild the physical index only when too many dead entries accumulate
-            dead_fraction = self.removed_since_rebuild / max(1, self.alive.size)
-            if (self.removed_since_rebuild >= rebuild_dead_min) or (dead_fraction >= rebuild_dead_ratio):
+            if self.removed_since_rebuild >= min(rebuild_dead_min, rebuild_dead_ratio*self.alive.size):
                 self.index = self._build_flat_index()
 
             if return_at is not None:
