@@ -232,7 +232,8 @@ class Compressor:
         rebuild_dead_ratio=0.2,
         rebuild_dead_min: int=1000,
         overquery: int=5,                # extra neighbors to fetch beyond D+1
-        progress_bar=False
+        progress_bar=False, 
+        print_progress=True
         ) -> None | dict:
         """
         Execute the Carathéodory peeling until the active set size ≤ dstop.
@@ -273,7 +274,8 @@ class Compressor:
             if return_at is not None:
                 if self.alive.size in return_list:
                     outputs[self.alive.size] = self.c_.copy()
-                    # print(f'Compress progress: {self.alive.size}/{self.d}')
+                    if print_progress:
+                        print(f'Compress progress: {self.alive.size}/{self.d}')
 
             if progress_bar:
                 removed = prev_alive - self.alive.size
