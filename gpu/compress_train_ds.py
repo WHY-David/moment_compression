@@ -21,11 +21,10 @@ def generate_train_data(size, func=f, noise=0., seed=0):
 def compress_train_ds(train_ds, return_list, k=1, tol=1e-12):
     # Compress with Compressor
     cp = Compressor(train_ds, tol=tol, index_type='flat')
-    weight_dict = cp.compress_weights(k, return_at=return_list, max_candidates=10000, overquery=0, progress_bar=True)
+    weight_dict = cp.compress_weights(k, return_at=return_list, max_candidates=10000, overquery=0, print_progress=True)
     return weight_dict
 
 
-# If run as script, run compression and print result
 if __name__ == '__main__':
     assert hasattr(faiss, 'StandardGpuResources'), "Install `faiss-gpu`, not CPU-only FAISS!"
 
