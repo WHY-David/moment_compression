@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1             # number of gpus per node
-
+#SBATCH --constraint="nomig&gpu40"
 #SBATCH --mem-per-cpu=1G         # memory per cpu-core (4G is default)
 #SBATCH --time=6:59:00          # total run time limit (HH:MM:SS)
 #SBATCH --mail-type=end
