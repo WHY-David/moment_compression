@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.linalg import null_space
+# from scipy.linalg import null_space
 import faiss
 import warnings
 from copy import copy
@@ -45,25 +45,32 @@ def multi_exponents(m, k):
 def all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
 
-def null_space_gpu(A, rcond=1e-12, device='cuda'):
-    # move data to torch
-    X = torch.from_numpy(A).to(device=device, dtype=torch.float64)
+def null_space_gpu(X, rcond=1e-12, device='cuda'):
+    """
+    Compute basis for null space of matrix X (torch.Tensor or np.ndarray) on GPU via SVD.
+    Returns a torch.Tensor of shape (n, nullity) on the device.
+    """
+    # Move or cast input to torch Tensor on the target device
+    if not isinstance(X, torch.Tensor):
+        X = torch.from_numpy(X)
+    # X = X.to(device=device, dtype=torch.float64)
 
+    # Full SVD to get Vh with shape (n, n)
     U, S, Vh = torch.linalg.svd(X, full_matrices=True)
 
-    # determine tolerance
+    # Determine tolerance for zero singular values
     tol = rcond * S.max()
-
-    # number of non-zero singular values = rank
     rank = int((S > tol).sum().item())
-    nullity = Vh.shape[0] - rank
-    if nullity <= 0:
-        # no null space
-        return np.zeros((A.shape[1], 0))
 
-    # null space basis = last `nullity` rows of Vh, transposed to shape (n, nullity)
+    # Nullity = number of zero singular values = n - rank
+    n = Vh.shape[1]
+    nullity = n - rank
+    if nullity <= 0:
+        return torch.empty((n, 0), device=device, dtype=X.dtype)
+
+    # Null space basis = last `nullity` rows of Vh, transposed -> shape (n, nullity)
     Z = Vh[rank:, :].T
-    return Z.cpu().numpy()
+    return Z
 
 
 class Compressor:
@@ -213,16 +220,20 @@ class Compressor:
         Caratheodory peeling
         Ensure len(subset) = Nmk+1
         '''
-        # Build D x (D+1) moment matrix for best_subset
-        A = np.empty((len(self.exps), len(subset)), dtype=float)
-        for col, j in enumerate(subset):
-            A[:, col] = all_moments(self.w_[j], self.exps)
+        # Fetch precomputed moment features for this subset (shape (subset_size, D))
+        A = self.all_moments[subset]             # torch.Tensor on device
+        # Transpose to shape (D, subset_size) for null-space
 
-        # Null-space direction
-        alpha = null_space(A, rcond=self.tol)[:, 0]
+        # Compute null-space basis on GPU; Z has shape (subset_size, nullity)
+        Z = null_space_gpu(A.T, rcond=self.tol, device=A.device)
+        # Take the first null vector (torch.Tensor on device)
+        alpha_t = Z[:, 0]                            # shape (subset_size,)
+
+        # Move alpha to CPU as numpy for weight updates
+        alpha = alpha_t.cpu().numpy()
+
         if not np.any(alpha > 0):
             alpha = -alpha
-
         # Determine maximal step t
         t = min((self.c_[j] / a_j) for a_j, j in zip(alpha, subset) if a_j > 0)
 
@@ -265,8 +276,11 @@ class Compressor:
             outputs = dict()
             return_list = sorted(list(return_at))
 
-        self.exps = multi_exponents(self.m, k)
-        Nmk = len(self.exps)
+        # precompute all moments
+        exps = multi_exponents(self.m, k)
+        Nmk = len(exps)
+        device = 'cuda'
+        self.all_moments = torch.from_numpy( np.stack([all_moments(w, exps) for w in self.w_], axis=0) ).to(device)
 
         # Determine stopping threshold
         if return_at is not None:
