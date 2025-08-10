@@ -1,13 +1,12 @@
 import numpy as np
 
 def f(x, y):
-    """Compute f(x, y) = exp(sin(pi * x) + y^2)."""
-    return np.exp(np.sin(np.pi * x) + y**2)
+    np.exp(np.sin(np.pi*x)+y**2)
 
 def generate_train_data(size, func=f, noise=0., seed=0):
     rng = np.random.default_rng(seed)
-    x = rng.uniform(-1, 1, size)
-    y = rng.uniform(-1, 1, size)
+    x = rng.uniform(0, 1, size)
+    y = rng.uniform(0, 1, size)
     fv = func(x, y)
     noise_vals = rng.normal(loc=0.0, scale=noise, size=size)
     fv_noisy = fv + noise_vals

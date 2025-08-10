@@ -34,6 +34,9 @@ def compress_train_ds(train_ds, return_list, k=1, tol=1e-12):
     # return weights[alive], alive_images
     return weight_dict
 
+def f(x,y):
+    return (x-y)%1.0
+
 
 # If run as script, run compression and print result
 if __name__ == '__main__':
@@ -42,7 +45,8 @@ if __name__ == '__main__':
     k = 1
     print(f"k = {k}")
 
-    train_ds = generate_train_data(d, noise=0.5, seed=seed)
+    train_ds = generate_train_data(d, func=f, noise=0., seed=seed)
+    test_ds = generate_train_data(10000, func=f, noise=0, seed=seed+42)
 
     lst = list(range(100, 1000, 100))
     return_list = lst + [10*d for d in lst] + [100*d for d in lst] + [1000*d for d in lst]

@@ -3,11 +3,10 @@ import os
 import random
 import matplotlib.pyplot as plt
 import torch
-from torchvision import datasets, transforms
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from common import TwoLayerNet
+from common import TwoLayerNet, fix_random_seed
 from data_gen import generate_train_data
 
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
@@ -27,26 +26,6 @@ if torch.backends.mps.is_available():
     torch.set_float32_matmul_precision("high")  # PyTorch ≥2.0
 
 
-
-def fix_random_seed(seed=0):
-    # Set a fixed random seed for reproducibility
-    random.seed(seed)
-    np.random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
-
-    torch.manual_seed(seed)
-
-    # Enforce deterministic algorithms where available
-    torch.use_deterministic_algorithms(True)
-
-    # Backend-specific determinism settings
-    # CUDA (if available): disable benchmark and ensure deterministic behavior
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-    # MPS (for macOS Metal): disable benchmark and enforce determinism
-    torch.backends.mps.deterministic = True
-    torch.backends.mps.benchmark = False
 
 
 def compute_loss(net, loader, loss_fn):
@@ -84,7 +63,7 @@ def weighted_loader(dataset, weight=None, batch_size=64):
 def bptrain(train_loader, test_loader, epochs, lr):
     net = TwoLayerNet(2,100).to(device)
     loss_fn = nn.MSELoss()
-    opt = torch.optim.SGD(net.parameters(), lr=lr)
+    opt = torch.optim.Adam(net.parameters(), lr=lr)
 
     train_losses = [compute_loss(net, train_loader, loss_fn)]
     test_losses = [compute_loss(net, test_loader, loss_fn)]
@@ -113,9 +92,9 @@ def bptrain(train_loader, test_loader, epochs, lr):
 
 if __name__ == '__main__':
     # hyperparams
-    epochs = 10
-    batch_size = 200
-    lr = 1e-2
+    epochs = 20
+    batch_size = 1000
+    lr = 1e-3
     seed = 0
 
     train_data = generate_train_data(100_000, noise=0.5, seed=seed)
@@ -141,7 +120,7 @@ if __name__ == '__main__':
     axs[0].plot(epochs_range, train_losses, marker='o', label=f"d={len(train_ds)}")
     axs[1].plot(epochs_range, test_losses, marker='o', label=f"d={len(train_ds)}")
 
-    d = 200
+    d = 1000
 
     # moment matching order
     for k in [1, 3, 5]:
@@ -166,13 +145,15 @@ if __name__ == '__main__':
 
     
     # final adjustments to the plot
+    axs[0].set_yscale('log')
     axs[0].set_ylabel('Train MSE')
     axs[0].grid(True)
     axs[0].legend()
+    axs[1].set_yscale('log')
     axs[1].set_xlabel('Epoch')
     axs[1].set_ylabel('Test MSE')
     axs[1].grid(True)
-    axs[1].legend()
+    # axs[1].legend()
     plt.tight_layout()
     plt.savefig(f"train_on_{d}.pdf", format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()
