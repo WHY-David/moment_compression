@@ -248,11 +248,13 @@ class Compressor:
     def compress_weights(self,
         k: int,
         dstop=None,                 # stop when d <= dstop; None means dstop = binom(m+k, k)
+        return_at=None,             # None or a list of dstop's
         candidate_fraction=0.1,     # fraction of alive points used as candidate centers
         max_candidates: int=5000,
         overquery: int=5,                # extra neighbors to fetch beyond D+1
         rebuild_interval: int=2,      # retrain / rebuild when this fraction of ORIGINAL points removed
-        return_at=None  # None or list; list ordered from small to large
+        progress_bar=False, 
+        print_progress=True
         ) -> None | dict:
         """
         Execute the Carathéodory peeling until the active set size ≤ dstop.
@@ -280,8 +282,9 @@ class Compressor:
             dstop = Nmk
 
         # progress bar setup
-        pbar = tqdm(total=self.d, desc="Compressing", unit="pt")
-        prev_alive = self.alive.size
+        if progress_bar:
+            pbar = tqdm(total=self.d, desc="Compressing", unit="pt")
+            prev_alive = self.alive.size
 
         # main loop
         while self.alive.size > dstop:
@@ -291,6 +294,8 @@ class Compressor:
             if return_at is not None:
                 if self.alive.size in return_list:
                     outputs[self.alive.size] = self.c_.copy()
+                    if print_progress:
+                        print(f'Compress progress: {self.alive.size}/{self.d}')
             
             if self.index_type == 'ivf':
                 # switch to flat when alive becomes small
@@ -304,13 +309,15 @@ class Compressor:
                     self.index = self._build_ivf_index()
                     rebuild_threshold -= rebuild_interval
 
-            # update progress bar at end of iteration
-            removed = prev_alive - self.alive.size
-            if removed > 0:
-                pbar.update(removed)
-                prev_alive = self.alive.size
-            pbar.set_postfix(best_diam=f"{best_diam:.2e}")
-        pbar.close()
+            if progress_bar:
+                removed = prev_alive - self.alive.size
+                if removed > 0:
+                    pbar.update(removed)
+                    prev_alive = self.alive.size
+                pbar.set_postfix(best_diam=f"{best_diam:.2e}")
+
+        if progress_bar:
+            pbar.close()
         
         if return_at is not None:
             return outputs

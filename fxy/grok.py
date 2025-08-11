@@ -176,10 +176,10 @@ if __name__ == '__main__':
         P=97,
         train_frac=0.5,      # try 0.4–0.6 for sharpest grokking
         width=256,           # 128–512 work; 256 is a common sweet spot
-        lr=5e-4,
-        weight_decay=5e-4,   # key to induce the memorization→rule transition
+        lr=1e-4,
+        weight_decay=1e-3,   # key to induce the memorization→rule transition
         steps=30_000,        # raise to 50_000 if needed
-        batch_size=4_096,
+        batch_size=2048,
         eval_every=100,
         seed=0,
         logy=True,

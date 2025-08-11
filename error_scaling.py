@@ -4,49 +4,18 @@ import multiprocessing as mp
 # from moment_matching import compress, compress_naive
 from compressor import Compressor
 
-# sigmoid function
-def sigmoid(z):
-    return 1.0 / (1.0 + np.exp(-z))
 
-def f(data: np.ndarray, num_samples: int = 100, seed: int = 0) -> float:
-    """
-    Given data of shape (d, m) representing {w_i}_{i=1}^d ⊂ ℝ^m,
-    returns the average over num_samples of
-        ∑_{i=1}^d sigmoid(w_i · x),
-    with x drawn i.i.d. ~ N(0,1)^m using the fixed seed.
-    """
-    # data.shape = (d, m)
+def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
     d, m = data.shape
-
-    # draw all x's at once for efficiency
-    rng = np.random.default_rng(seed)
-    X = rng.standard_normal((num_samples, m))    # shape (num_samples, m)
-
-    # compute dot products: shape (num_samples, d)
-    D = X @ data.T
-
-    # apply sigmoid and sum over i for each sample
-    sums = sigmoid(D).sum(axis=1)                 # shape (num_samples,)
-
-    # return the average over samples
-    return sums.mean()
-
-
-# define a weighted version of f to handle compress outputs
-def f_weighted(c, W, num_samples: int = 100, seed: int = 0) -> float:
-    """
-    c : weights array of length L
-    W : array shape (L, m)
-    returns average over num_samples of sum_j c_j * sigmoid(2 * W_j · x)
-    """
-    rng = np.random.default_rng(seed)
-    m = W.shape[1]
-    X = rng.standard_normal((num_samples, m))
-    # compute dot products: shape (num_samples, L)
-    D = X @ W.T
-
-    S = sigmoid(D) @ c  # shape (num_samples,)
-    return S.mean()
+    assert x.size == m
+    y = data @ x
+    y = np.exp(y)
+    if weights is not None:
+        assert weights.size == d
+        y = y @ weights / sum(weights)
+    else:
+        y = np.mean(y)
+    return np.sin(y)
 
 
 
@@ -76,12 +45,13 @@ def dstop(d):
 def run_trial(args):
     k, d, t = args
     rng = np.random.default_rng(seed_data + t)
-    data = rng.random((d, m))
-    orig = f(data, num_samples=num_samples, seed=seed_f)
-    # c, W = compress(data, k, dstop = dstop(d), index_type='flat')
+    x = 2*rng.random(m) - 1
+    data = 2*rng.random((d, m)) - 1
+    orig = f(data, x)
+    
     worker = Compressor(data)
     c, W = worker.compress(k, dstop = dstop(d))
-    comp = f_weighted(c, W, num_samples=num_samples, seed=seed_f)
+    comp = f(W, x, weights=c)
     return k, d, abs(comp - orig)
 
 
@@ -129,7 +99,7 @@ if __name__ == "__main__":
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel(r"Data set size $d$")
-    plt.ylabel(r"$|f_{\mathrm{comp}} - f_{\mathrm{orig}}|$")
+    plt.ylabel(r"$\max|f(\theta')-f(\theta)|$")
     plt.title(r"Compression: $d \to 0.35d$. "+f"Data dimension m={m}")
     plt.legend()
     plt.tight_layout()
