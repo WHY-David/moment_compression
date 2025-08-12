@@ -7,29 +7,28 @@ from compressor import Compressor
 
 def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
     d, m = data.shape
-    assert x.size == m
+    assert x.shape[0] == m
     y = data @ x
     y = np.exp(y)
+    y = np.mean(y, axis=1)
     if weights is not None:
         assert weights.size == d
         y = y @ weights / sum(weights)
     else:
         y = np.mean(y)
-    return np.sin(y)
-
-
+    return np.sin(2*np.pi*y)
 
 
 
 # parameters
-m = 2   # dimension of each point
-d_list = [100, 200, 400, 800, 1600, 3200]
+m = 3   # dimension of each point
+d_list = [100, 200, 400, 800, 1600, 3200, 6400]
 trials_per_d = 10
 num_samples = 10
 seed_data = 0
 seed_f = 42
 k_list = [1, 2, 3, 4]
-filename = 'figures/linear_m2.pdf'
+filename = f'figures/linear_m{m}.pdf'
 
 
 # initialize results dict: results[k][d] = list of errors
@@ -45,7 +44,7 @@ def dstop(d):
 def run_trial(args):
     k, d, t = args
     rng = np.random.default_rng(seed_data + t)
-    x = 2*rng.random(m) - 1
+    x = 2*rng.random((m, 10)) - 1
     data = 2*rng.random((d, m)) - 1
     orig = f(data, x)
     
@@ -103,5 +102,5 @@ if __name__ == "__main__":
     plt.title(r"Compression: $d \to 0.35d$. "+f"Data dimension m={m}")
     plt.legend()
     plt.tight_layout()
-    # plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
+    plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()

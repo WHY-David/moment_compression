@@ -1,7 +1,7 @@
 import numpy as np
 
 def f(x, y):
-    np.exp(np.sin(np.pi*x)+y**2)
+    return np.exp(np.sin(np.pi*x)+y**2)
 
 def generate_train_data(size, func=f, noise=0., seed=0):
     rng = np.random.default_rng(seed)
