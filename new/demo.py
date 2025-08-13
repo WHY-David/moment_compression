@@ -18,7 +18,7 @@ def demo_2d(d=1000, k=2, seed=0, **kwargs):
     data = np.random.randn(d, 2)
 
     # compress
-    compressor = Compressor(data, tol=1e-12, index_type='flat')
+    compressor = Compressor(data, tol=1e-12)
     c_, w_ = compressor.compress(k, **kwargs)
 
     # Compute tensors and calculate error
@@ -93,5 +93,5 @@ def demo_3d(d=500, k=2, seed=0, **kwargs):
 
 if __name__ == "__main__":
     # run demo with default parameters
-    demo_2d(d=100000, k=2, dstop=1000, verbose=True)
+    demo_3d(d=100000, k=2, dstop=100, print_progress=True)
     # demo_3d(d=1000, k=2, seed=0)

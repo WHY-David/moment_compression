@@ -12,7 +12,7 @@ Tensor = torch.Tensor
 
 class Sin(nn.Module):
     def forward(self, x):
-        return torch.sin(2*torch.pi*10*x)
+        return torch.sin(2*torch.pi*20*x)
 
 class TwoLayerNet(nn.Module):
     def __init__(self, input_dim, hidden_dim):
@@ -121,7 +121,7 @@ def generate_train_data(
 
 if __name__ == "__main__":
     # Example usage
-    size = 10_000
+    size = 20_000
     data = generate_train_data(size, func=f, noise=0.0, seed=42, return_tensor=False)
 
     # 3D scatter plot of (x, y, f(x,y))
