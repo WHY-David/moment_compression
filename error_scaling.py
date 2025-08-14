@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 # from moment_matching import compress, compress_naive
-from compressor import Compressor
+from new.compressor import Compressor
 
 
 def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
@@ -22,8 +22,8 @@ def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
 
 # parameters
 m = 3   # dimension of each point
-d_list = [100, 200, 400, 800, 1600, 3200, 6400]
-trials_per_d = 10
+d_list = [1000, 2000, 4000, 8000, 16000, 32000]
+trials_per_d = 5
 num_samples = 10
 seed_data = 0
 seed_f = 42
@@ -49,7 +49,7 @@ def run_trial(args):
     orig = f(data, x)
     
     worker = Compressor(data)
-    c, W = worker.compress(k, dstop = dstop(d))
+    c, W = worker.compress(k, dstop = dstop(d), print_progress=True)
     comp = f(W, x, weights=c)
     return k, d, abs(comp - orig)
 
@@ -102,5 +102,5 @@ if __name__ == "__main__":
     plt.title(r"Compression: $d \to 0.35d$. "+f"Data dimension m={m}")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
+    # plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()

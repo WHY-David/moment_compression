@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.cluster import MiniBatchKMeans, AgglomerativeClustering
 import faiss
 import warnings
-from tqdm import tqdm
+# from tqdm import tqdm
 from typing import Union, Optional
 from joblib import Parallel, delayed
 
@@ -159,26 +159,27 @@ class Compressor:
             max_trials = 5
             ridge = 0
             z = None
-            for _ in range(max_trials):
-                # Random probe and projection onto Null(AS):
-                # z = (I - AS^T (AS AS^T + λI)^{-1} AS) r
-                r = self.rng.standard_normal(len(S))
-                Ar = AS @ r
-                G = AS @ AS.T
-                G_reg = G + ridge * np.eye(G.shape[0])
-                try:
-                    y = np.linalg.solve(G_reg, Ar)
-                except np.linalg.LinAlgError:
-                    # extremely ill-conditioned: fall back to least squares on the regularized system
-                    y = np.linalg.lstsq(G_reg, Ar, rcond=None)[0]
-                z_candidate = r - AS.T @ y
-                if not np.any(z_candidate > 0):
-                    z_candidate = -z_candidate
-                resid = np.linalg.norm(AS @ z_candidate)
-                # accept if we got a reasonably good null vector with some positive entries
-                if np.any(z_candidate > 1e-5) and resid <= 1e-8 * (1.0 + np.linalg.norm(Ar)):
-                    z = z_candidate
-                    break
+            if len(S) > 1.3*target:
+                for _ in range(max_trials):
+                    # Random probe and projection onto Null(AS):
+                    # z = (I - AS^T (AS AS^T + λI)^{-1} AS) r
+                    r = self.rng.standard_normal(len(S))
+                    Ar = AS @ r
+                    G = AS @ AS.T
+                    G_reg = G + ridge * np.eye(G.shape[0])
+                    try:
+                        y = np.linalg.solve(G_reg, Ar)
+                    except np.linalg.LinAlgError:
+                        # extremely ill-conditioned: fall back to least squares on the regularized system
+                        y = np.linalg.lstsq(G_reg, Ar, rcond=None)[0]
+                    z_candidate = r - AS.T @ y
+                    if not np.any(z_candidate > 0):
+                        z_candidate = -z_candidate
+                    resid = np.linalg.norm(AS @ z_candidate)
+                    # accept if we got a reasonably good null vector with some positive entries
+                    if np.any(z_candidate > 1e-5) and resid <= 1e-8 * (1.0 + np.linalg.norm(Ar)):
+                        z = z_candidate
+                        break
 
             if z is None:
                 # Fallback: use SVD to get a null vector
@@ -207,8 +208,6 @@ class Compressor:
     def compress(self, 
                  k:int, # moment matching order
                  dstop: Optional[int] = None,
-                 over_cluster: int = 3,
-                 expand = 2.0,
                  print_progress=False
                  ):
         exps = multi_exponents(self.m, k)
@@ -223,7 +222,7 @@ class Compressor:
             warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
             dstop = Nmk
 
-        method = 'kmeans' if self.alive.size>5000 else 'greedy'
+        method = 'kmeans' if self.alive.size>dstop+5000 else 'greedy'
         if method == 'greedy':
             self._build_index()
 
@@ -231,7 +230,7 @@ class Compressor:
             prev_alive_size = self.alive.size
             # choose kmeans or greedy automatically
             if method == 'kmeans':
-                n_clusters = int(min(0.9*self.alive.size / Nmk, 100*dstop/Nmk))
+                n_clusters = int(min(0.95*self.alive.size / Nmk, 100*dstop/Nmk))
                 mbk = MiniBatchKMeans(n_clusters=n_clusters, max_iter=200, batch_size=4096, random_state=0)
                 labels = mbk.fit_predict(self.w_[self.alive], sample_weight=self.c_[self.alive])
                 # indices within mask
@@ -255,7 +254,7 @@ class Compressor:
                     self.alive = self.alive[~np.isin(self.alive, to_remove)]
 
                 if print_progress:
-                    print(f"KMeans round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, #clusters={n_clusters}, diam={diam}")
+                    print(f"KMeans round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, #clusters={n_clusters}, diam={diam:.2e}")
                 if self.alive.size < 5000 or n_clusters < 50:
                     method = 'greedy'
                     self._build_index()
@@ -264,7 +263,7 @@ class Compressor:
                 assert len(best_subset) == Nmk+1
                 self._reduce(best_subset) # update c and remove pts from index
                 if print_progress and self.alive.size%500==0:
-                    print(f"Greedy round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, best diam={best_diam}")
+                    print(f"Greedy round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, best diam={best_diam:.2e}")
             else:
                 raise RuntimeError("Undefined reduction method")
 
