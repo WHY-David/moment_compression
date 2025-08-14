@@ -65,7 +65,7 @@ class Compressor:
         self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
 
 
-    def _diameter(self, idx_subset: np.ndarray) -> float:
+    def _diameter(self, idx_subset) -> float:
         Y = self.w_[idx_subset]
         norms = np.sum(Y * Y, axis=1, keepdims=True)
         D2 = norms + norms.T - 2.0 * (Y @ Y.T)
@@ -130,65 +130,11 @@ class Compressor:
 
     def _reduce(self, subset):
         """
-        Given A (n x d) and c >= 0 (size d), find c' >= 0 with at most n positive
-        entries such that A @ c' == A @ c (up to numerical tolerance).
-
-        Uses the standard nullspace "support-pruning" algorithm implied by the
-        conic Carathéodory theorem.
-
-        Parameters
-        ----------
-        A : (n, d) array_like
-            Matrix with d > n typically.
-        c : (d,) array_like
-            Nonnegative weights (all-positive allowed).
-        tol : float
-            Numerical tolerance to decide zeros and cleanup.
+        This updates index as well. Used in greedy
         """
-        A = self.all_moments[:, subset]
-        c = self.c_[subset].copy()
-        if np.any(c < -self.tol):
-            raise ValueError("c must be nonnegative (within tolerance).")
-        b = A @ c
-        # We only need to ensure <= n positives (could be tighter: rank(A))
-        target = np.linalg.matrix_rank(A, tol=self.tol)
-
-        # Current support (indices with strictly positive mass)
-        S = np.flatnonzero(c > self.tol).tolist()
-
-        # At each step, find z in Null(A[:, S]) and move to the face where one coord hits 0
-        # while maintaining nonnegativity.
-        while len(S) > target:
-            _, svals, Vh = np.linalg.svd(A[:, S], full_matrices=True)
-            z = Vh[-1, :]  # shape (|S|,)
-
-            # Ensure we move in a direction that decreases some positive coordinate.
-            if not np.any(z > 0):
-                z = -z
-            if not np.any(z > 0):
-                # Extremely pathological numeric case (shouldn't happen if |S| > rank)
-                # break to avoid infinite loop.
-                break
-
-            # Step size to hit the boundary c_S - t z >= 0, with at least one 0.
-            zpos = z > 0
-            t = np.min((c[S][zpos]) / z[zpos])
-
-            # Update and clean
-            c[S] -= t * z
-            S = [idx for idx in S if c[idx] > self.tol]
-
-        # Clean up
-        c[c < self.tol] = 0.0
-        # Sanity checks (tolerant)
-        diff = np.linalg.norm(A @ c - b)
-        if diff > 1e-8 * (1.0 + np.linalg.norm(b)):
-            # Very rare; if it happens due to rounding, gently re-fit on the support.
-            raise RuntimeError("A@c != b")
-
-        # update weights, mask and index
+        _, c = self._reduce_compute(subset)
         self.c_[subset] = c
-        remove = [subset[i] for i in np.flatnonzero(c < self.tol)]
+        remove = subset[c < self.tol]
         if len(remove):
             self.alive = self.alive[~np.isin(self.alive, remove)]
             self.index.remove_ids(np.array(remove, dtype=int))
@@ -197,34 +143,65 @@ class Compressor:
         """
         Pure computation version of _reduce: does not mutate self.c_ or self.alive.
         Returns (subset, c_updated, remove_indices).
+        Used in parallel
         """
+        # subset = np.asarray(subset, dtype=int)
         A = self.all_moments[:, subset]
         c = self.c_[subset].copy()
         if np.any(c < -self.tol):
             raise ValueError("c must be nonnegative (within tolerance).")
-        b = A @ c
-        target = np.linalg.matrix_rank(A, tol=self.tol)
+        b = A@c
+        target = A.shape[0]
 
         S = np.flatnonzero(c > self.tol).tolist()
         while len(S) > target:
-            _, svals, Vh = np.linalg.svd(A[:, S], full_matrices=True)
-            z = Vh[-1, :]
-            if not np.any(z > 0):
-                z = -z
-            if not np.any(z > 0):
-                break
+            AS = A[:, S]
+            max_trials = 5
+            ridge = 0
+            z = None
+            for _ in range(max_trials):
+                # Random probe and projection onto Null(AS):
+                # z = (I - AS^T (AS AS^T + λI)^{-1} AS) r
+                r = self.rng.standard_normal(len(S))
+                Ar = AS @ r
+                G = AS @ AS.T
+                G_reg = G + ridge * np.eye(G.shape[0])
+                try:
+                    y = np.linalg.solve(G_reg, Ar)
+                except np.linalg.LinAlgError:
+                    # extremely ill-conditioned: fall back to least squares on the regularized system
+                    y = np.linalg.lstsq(G_reg, Ar, rcond=None)[0]
+                z_candidate = r - AS.T @ y
+                if not np.any(z_candidate > 0):
+                    z_candidate = -z_candidate
+                resid = np.linalg.norm(AS @ z_candidate)
+                # accept if we got a reasonably good null vector with some positive entries
+                if np.any(z_candidate > 1e-5) and resid <= 1e-8 * (1.0 + np.linalg.norm(Ar)):
+                    z = z_candidate
+                    break
+
+            if z is None:
+                # Fallback: use SVD to get a null vector
+                _, _, Vh = np.linalg.svd(AS, full_matrices=True)
+                z = Vh[-1, :]
+                if not np.any(z > 0):
+                    z = -z
+                if not np.any(z > 0):
+                    break
+
+            # update c
             zpos = z > 0
             t = np.min((c[S][zpos]) / z[zpos])
             c[S] -= t * z
             S = [idx for idx in S if c[idx] > self.tol]
 
+        # sanity check
         c[c < self.tol] = 0.0
         diff = np.linalg.norm(A @ c - b)
         if diff > 1e-8 * (1.0 + np.linalg.norm(b)):
-            raise RuntimeError("A@c != b")
+            raise RuntimeError(f"||A@c - b|| = {diff:.3e}")
 
-        remove = np.array(subset[i] for i in np.flatnonzero(c < self.tol))
-        return subset, c, remove
+        return subset, c
 
 
     def compress(self, 
@@ -254,13 +231,15 @@ class Compressor:
             prev_alive_size = self.alive.size
             # choose kmeans or greedy automatically
             if method == 'kmeans':
-                n_clusters = int(max(0.9*self.alive.size / Nmk, 100*dstop/Nmk))
+                n_clusters = int(min(0.9*self.alive.size / Nmk, 100*dstop/Nmk))
                 mbk = MiniBatchKMeans(n_clusters=n_clusters, max_iter=200, batch_size=4096, random_state=0)
                 labels = mbk.fit_predict(self.w_[self.alive], sample_weight=self.c_[self.alive])
                 # indices within mask
                 clusters = [np.where(labels==j)[0].tolist() for j in range(n_clusters)]
                 # indicies in the original labeling
-                tasks = [np.array(self.alive[subset], dtype=int) for subset in clusters if len(subset) > Nmk]
+                tasks = [self.alive[subset] for subset in clusters if len(subset) > Nmk]
+
+                diam = max(self._diameter(subset) for subset in tasks)
 
                 # Parallel loop to compress each subset
                 results = Parallel(n_jobs=-1, prefer='threads')(
@@ -268,22 +247,22 @@ class Compressor:
                 )
                 # Commit phase: write back weights and update alive/index once
                 to_remove = []
-                for subset, c_new, remove in results:
+                for subset, c_new in results:
                     self.c_[subset] = c_new
+                    remove = subset[c_new < self.tol]
                     to_remove.extend(remove.tolist())
-                if len(to_remove):
+                if len(to_remove) != 0:
                     self.alive = self.alive[~np.isin(self.alive, to_remove)]
 
                 if print_progress:
-                    print(f"KMeans round: #clusters={n_clusters}, #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}")
+                    print(f"KMeans round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, #clusters={n_clusters}, diam={diam}")
                 if self.alive.size < 5000 or n_clusters < 50:
                     method = 'greedy'
                     self._build_index()
             elif method == 'greedy':
                 best_diam, best_subset = self._find_best_subset(Nmk+1, overquery=0, candidate_fraction=0.1, max_candidates=5000)
                 assert len(best_subset) == Nmk+1
-                self._reduce(best_subset)
-                # update index!
+                self._reduce(best_subset) # update c and remove pts from index
                 if print_progress and self.alive.size%500==0:
                     print(f"Greedy round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, best diam={best_diam}")
             else:
