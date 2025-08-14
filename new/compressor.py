@@ -38,6 +38,39 @@ def multi_exponents(m, k):
 def all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
 
+def find_null_vec(A, rng, max_trials=5, ridge = 0., tol=1e-12):
+    z = None
+    if A.shape[1] > 1.5*A.shape[0]:
+        for _ in range(max_trials):
+            # Random probe and projection onto Null(AS):
+            # z = (I - AS^T (AS AS^T + λI)^{-1} AS) r
+            r = rng.standard_normal(A.shape[1])
+            Ar = A @ r
+            G = A @ A.T
+            G_reg = G + ridge * np.eye(G.shape[0])
+            try:
+                y = np.linalg.solve(G_reg, Ar)
+            except np.linalg.LinAlgError:
+                # extremely ill-conditioned: fall back to least squares on the regularized system
+                y = np.linalg.lstsq(G_reg, Ar, rcond=None)[0]
+            z_candidate = r - A.T @ y
+            if not np.any(z_candidate > 0):
+                z_candidate = -z_candidate
+            resid = np.linalg.norm(A @ z_candidate)
+            # accept if we got a reasonably good null vector with some positive entries
+            if np.any(z_candidate > 1e-5) and resid <= tol * (1.0 + np.linalg.norm(Ar)):
+                z = z_candidate
+                break
+
+    if z is None:
+        # Fallback: use SVD to get a null vector
+        _, _, Vh = np.linalg.svd(A, full_matrices=True)
+        z = Vh[-1, :]
+        if not np.any(z > 0):
+            z = -z
+
+    return z
+
 
 class Compressor:
     """
@@ -156,40 +189,7 @@ class Compressor:
         S = np.flatnonzero(c > self.tol).tolist()
         while len(S) > target:
             AS = A[:, S]
-            max_trials = 5
-            ridge = 0
-            z = None
-            if len(S) > 1.3*target:
-                for _ in range(max_trials):
-                    # Random probe and projection onto Null(AS):
-                    # z = (I - AS^T (AS AS^T + λI)^{-1} AS) r
-                    r = self.rng.standard_normal(len(S))
-                    Ar = AS @ r
-                    G = AS @ AS.T
-                    G_reg = G + ridge * np.eye(G.shape[0])
-                    try:
-                        y = np.linalg.solve(G_reg, Ar)
-                    except np.linalg.LinAlgError:
-                        # extremely ill-conditioned: fall back to least squares on the regularized system
-                        y = np.linalg.lstsq(G_reg, Ar, rcond=None)[0]
-                    z_candidate = r - AS.T @ y
-                    if not np.any(z_candidate > 0):
-                        z_candidate = -z_candidate
-                    resid = np.linalg.norm(AS @ z_candidate)
-                    # accept if we got a reasonably good null vector with some positive entries
-                    if np.any(z_candidate > 1e-5) and resid <= 1e-8 * (1.0 + np.linalg.norm(Ar)):
-                        z = z_candidate
-                        break
-
-            if z is None:
-                # Fallback: use SVD to get a null vector
-                _, _, Vh = np.linalg.svd(AS, full_matrices=True)
-                z = Vh[-1, :]
-                if not np.any(z > 0):
-                    z = -z
-                if not np.any(z > 0):
-                    break
-
+            z = find_null_vec(AS, self.rng, tol=self.tol)
             # update c
             zpos = z > 0
             t = np.min((c[S][zpos]) / z[zpos])
@@ -230,7 +230,7 @@ class Compressor:
             prev_alive_size = self.alive.size
             # choose kmeans or greedy automatically
             if method == 'kmeans':
-                n_clusters = int(min(0.95*self.alive.size / Nmk, 100*dstop/Nmk))
+                n_clusters = int(min(0.98*self.alive.size / Nmk, 100*dstop/Nmk))
                 mbk = MiniBatchKMeans(n_clusters=n_clusters, max_iter=200, batch_size=4096, random_state=0)
                 labels = mbk.fit_predict(self.w_[self.alive], sample_weight=self.c_[self.alive])
                 # indices within mask

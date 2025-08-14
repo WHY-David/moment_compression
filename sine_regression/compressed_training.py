@@ -185,7 +185,7 @@ if __name__ == '__main__':
     axs[0].plot(range(0, epochs + 1), losses_cp,    color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
     axs[0].set_ylabel('MSE Loss')
     axs[0].set_yscale('log')
-    axs[0].grid(True, linewidth=0.25)
+    # axs[0].grid(True, linewidth=0.25)
     axs[0].legend()
 
     # Predictions at x=0.618
@@ -193,14 +193,14 @@ if __name__ == '__main__':
     axs[1].plot(range(0, epochs + 1), pred1,      color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
     axs[1].plot(range(0, epochs + 1), pred2,      color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
     axs[1].set_ylabel('prediction at x=0.618')
-    axs[1].grid(True, linewidth=0.25)
+    # axs[1].grid(True, linewidth=0.25)
     axs[1].legend()
 
     # Lower: pred_dif vs epoch
     axs[2].plot(range(0, epochs + 1), diffs, color='tab:red', marker='s', markersize=6)
     axs[2].set_xlabel('Epoch')
     axs[2].set_ylabel(r'$\max_x |NN_{orig}(x) - NN_{comp}(x)|$')
-    axs[2].grid(True, linewidth=0.25)
+    # axs[2].grid(True, linewidth=0.25)
 
     plt.tight_layout()
     plt.savefig('training_relu_adam.pdf', format='pdf', bbox_inches='tight', pad_inches=0)

@@ -4,30 +4,29 @@ import multiprocessing as mp
 # from moment_matching import compress, compress_naive
 from new.compressor import Compressor
 
-
 def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
     d, m = data.shape
     assert x.shape[0] == m
     y = data @ x
-    y = np.exp(y)
+    y = 1./(1+np.exp(-1*y))
     y = np.mean(y, axis=1)
     if weights is not None:
         assert weights.size == d
         y = y @ weights / sum(weights)
     else:
         y = np.mean(y)
-    return np.sin(2*np.pi*y)
+    # return np.sin(2*np.pi*y)
 
 
 
 # parameters
 m = 3   # dimension of each point
-d_list = [1000, 2000, 4000, 8000, 16000, 32000]
-trials_per_d = 5
+d_list = [1000, 2000, 4000, 8000, 16000]
+trials_per_d = 1
 num_samples = 10
 seed_data = 0
 seed_f = 42
-k_list = [1, 2, 3, 4]
+k_list = [1, 2, 3, 4, 5, 6]
 filename = f'figures/linear_m{m}.pdf'
 
 
@@ -38,19 +37,20 @@ results = {k: {d: [] for d in d_list} for k in k_list}
 # determine the final data set size
 def dstop(d):
     # return int(3.5*d**0.5)
-    return int(0.35*d)
+    return int(0.1*d)
     # return 35
 
 def run_trial(args):
     k, d, t = args
-    rng = np.random.default_rng(seed_data + t)
+    rng = np.random.default_rng(seed_data + d + t)
     x = 2*rng.random((m, 10)) - 1
     data = 2*rng.random((d, m)) - 1
     orig = f(data, x)
     
     worker = Compressor(data)
-    c, W = worker.compress(k, dstop = dstop(d), print_progress=True)
+    c, W = worker.compress(k, dstop = dstop(d), print_progress=False)
     comp = f(W, x, weights=c)
+    print(f"Completed k = {k}, d = {d}, t = {t}")
     return k, d, abs(comp - orig)
 
 
@@ -64,6 +64,8 @@ if __name__ == "__main__":
     # populate results dictionary
     for k, d, err in results_list:
         results[k][d].append(err)
+
+    np.save("error_list.npy", results_list)
 
     # compute max errors for each k
     max_errors = {
@@ -99,7 +101,7 @@ if __name__ == "__main__":
     plt.yscale('log')
     plt.xlabel(r"Data set size $d$")
     plt.ylabel(r"$\max|f(\theta')-f(\theta)|$")
-    plt.title(r"Compression: $d \to 0.35d$. "+f"Data dimension m={m}")
+    plt.title(r"Compression: $d \to 0.1d$. "+f"Data dimension m={m}")
     plt.legend()
     plt.tight_layout()
     # plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)

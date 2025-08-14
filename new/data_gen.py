@@ -121,7 +121,7 @@ def generate_train_data(
 
 if __name__ == "__main__":
     # Example usage
-    size = 20_000
+    size = 1_000_000
     data = generate_train_data(size, func=f, noise=0.0, seed=42, return_tensor=False)
 
     # 3D scatter plot of (x, y, f(x,y))
@@ -129,16 +129,16 @@ if __name__ == "__main__":
     ys = data[:, 1]
     zs = data[:, 2]
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(xs, ys, zs, s=2)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("f(x, y)")
-    ax.set_title("Generated data: 3D scatter")
-    plt.show()
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection="3d")
+    # ax.scatter(xs, ys, zs, s=2)
+    # ax.set_xlabel("x")
+    # ax.set_ylabel("y")
+    # ax.set_zlabel("f(x, y)")
+    # ax.set_title("Generated data: 3D scatter")
+    # plt.show()
 
     # Uncomment to save to CSV
-    # output_path = 'data.csv'
-    # np.savetxt(output_path, data, delimiter=',', header='x,y,f', comments='')
-    # print(f"Data saved to {output_path} (shape: {data.shape})")
+    output_path = 'data.csv'
+    np.savetxt(output_path, data, delimiter=',', header='x,y,f', comments='')
+    print(f"Data saved to {output_path} (shape: {data.shape})")
