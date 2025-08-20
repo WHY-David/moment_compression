@@ -123,7 +123,7 @@ if __name__ == "__main__":
     axs[0].plot(epochs_range, train_losses, marker='o', label=f"d={dstop}")
     axs[1].plot(epochs_range, test_losses, marker='o', label=f"d={dstop}")
 
-        # final adjustments to the plot
+    # final adjustments to the plot
     axs[0].set_yscale('log')
     axs[0].set_ylabel('Train MSE')
     axs[0].grid(True)
