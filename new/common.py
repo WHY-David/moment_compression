@@ -3,9 +3,9 @@ import random
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset
+from matplotlib import pyplot as plt
 
 import sys, os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from compressor import Compressor
 
 class TwoLayerNet(nn.Module):
@@ -147,3 +147,47 @@ def load_data(filename):
     x = torch.from_numpy(data[:, [0]]).float().to(device)
     y = torch.from_numpy(data[:, [1]]).float().to(device)
     return TensorDataset(x, y)
+
+def make_canvas(
+    axes_width_pt: float = 300.0,
+    axes_aspect: float = 2/3,
+    left_pt: float = 40.0,
+    right_pt: float = 20.0,
+    bottom_pt: float = 35.0,
+    top_pt: float = 20.0,
+    fontsize: float = 8.0,
+):
+    _PT_PER_IN = 72.0
+    # Use PDF “base 14” fonts (Helvetica) — no TTF embedding, no fontTools warnings
+    plt.rcParams.update({
+        "pdf.use14corefonts": True,   # key line
+        "ps.useafm": True,            # for .ps if you ever use it
+        # Do NOT set pdf.fonttype/ps.fonttype when using core fonts
+        "text.usetex": False,         # set True only if you want LaTeX (see Option C)
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Helvetica"],
+        "font.size": fontsize,
+        "axes.titlesize": fontsize,
+        "axes.labelsize": fontsize,
+        "xtick.labelsize": fontsize,
+        "ytick.labelsize": fontsize,
+        "legend.fontsize": fontsize,
+    })
+    # Make math text look sans-ish to match Helvetica
+    plt.rcParams.update({
+        "mathtext.fontset": "stixsans",
+    })
+
+    axes_h_pt = axes_width_pt * float(axes_aspect)
+    fig_w_pt = left_pt + axes_width_pt + right_pt
+    fig_h_pt = bottom_pt + axes_h_pt + top_pt
+
+    fig = plt.figure(figsize=(fig_w_pt/_PT_PER_IN, fig_h_pt/_PT_PER_IN))
+    ax = fig.add_axes([
+        left_pt/fig_w_pt,
+        bottom_pt/fig_h_pt,
+        axes_width_pt/fig_w_pt,
+        axes_h_pt/fig_h_pt,
+    ])
+    # ax.grid(True, which="both", linestyle=":", linewidth=0.5)
+    return fig, ax

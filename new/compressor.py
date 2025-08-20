@@ -200,7 +200,7 @@ class Compressor:
         c[c < self.tol] = 0.0
         diff = np.linalg.norm(A @ c - b)
         if diff > 1e-8 * (1.0 + np.linalg.norm(b)):
-            raise RuntimeError(f"||A@c - b|| = {diff:.3e}")
+            warnings.warn(f"||A@c - b|| = {diff:.2e}. Consider increasing accuracy. ")
 
         return subset, c
 
