@@ -8,10 +8,12 @@ from common import TwoLayerNet, fix_random_seed, make_canvas
 from compressor import Compressor
 from data_gen import generate_train_data
 
+device = torch.device("cuda")
+
 def make_loader(data, num_samples:int, weights=None, batch_size=64):
-    x = torch.from_numpy(data[:, [0]]).to(device)
-    y = torch.from_numpy(data[:, [1]]).to(device)
-    ds = TensorDataset(x, y)
+    X = torch.from_numpy(data[:, :2]).float().to(device)      # shape (N, 2) -> (x, y)
+    y = torch.from_numpy(data[:, [2]]).float().to(device)     # shape (N, 1) -> f(x, y)
+    ds = TensorDataset(X, y)
     if weights is None:
         sampler = RandomSampler(
             data_source=ds,
@@ -19,7 +21,7 @@ def make_loader(data, num_samples:int, weights=None, batch_size=64):
             num_samples=num_samples
         )
     else:
-        weights_t = torch.tensor(weights, dtype=torch.float, device='cpu')
+        weights_t = torch.tensor(weights, dtype=torch.float, device=device)
         sampler = WeightedRandomSampler(
             weights=weights_t,
             num_samples=num_samples,
@@ -32,9 +34,9 @@ def make_loader(data, num_samples:int, weights=None, batch_size=64):
     )
 
 def make_test_loader(data, batch_size=64):
-    x = torch.from_numpy(data[:, [0]]).to(device)
-    y = torch.from_numpy(data[:, [1]]).to(device)
-    ds = TensorDataset(x, y)
+    X = torch.from_numpy(data[:, :2]).float().to(device)      # shape (N, 2) -> (x, y)
+    y = torch.from_numpy(data[:, [2]]).float().to(device)     # shape (N, 1) -> f(x, y)
+    ds = TensorDataset(X, y)
     return DataLoader(ds, batch_size=batch_size)
 
 def compute_loss(net, loader, loss_fn):
@@ -77,15 +79,13 @@ def bptrain(train_loader, test_loader, hidden_dim, epochs, lr):
     return train_losses, test_losses
 
 if __name__ == "__main__":
-    device = torch.device("mps")
-
     d = 100_000
-    dstop = 1_000
+    dstop = 500
     k = 3
     test_size = 10_000
     hidden_dim = 100
-    lr = 1e-4
-    epochs = 50
+    lr = 2e-5
+    epochs = 1000
     batch_size = 256
     seed = 42
 
@@ -135,4 +135,4 @@ if __name__ == "__main__":
     # axs[1].legend()
     plt.tight_layout()
     plt.savefig(f"compress_trainds.pdf", format='pdf', bbox_inches='tight', pad_inches=0)
-    plt.show()
+    # plt.show()

@@ -1,0 +1,181 @@
+KMeans round: #alive=49408/100000, #removed=50592, #clusters=2500, diam=2.84e-01
+KMeans round: #alive=42013/100000, #removed=7395, #clusters=2420, diam=2.51e-01
+KMeans round: #alive=36138/100000, #removed=5875, #clusters=2058, diam=2.93e-01
+KMeans round: #alive=31348/100000, #removed=4790, #clusters=1770, diam=2.12e-01
+KMeans round: #alive=27294/100000, #removed=4054, #clusters=1536, diam=3.17e-01
+KMeans round: #alive=23928/100000, #removed=3366, #clusters=1337, diam=2.91e-01
+KMeans round: #alive=20875/100000, #removed=3053, #clusters=1172, diam=2.24e-01
+KMeans round: #alive=18513/100000, #removed=2362, #clusters=1022, diam=2.47e-01
+KMeans round: #alive=16438/100000, #removed=2075, #clusters=907, diam=2.69e-01
+KMeans round: #alive=14615/100000, #removed=1823, #clusters=805, diam=3.06e-01
+KMeans round: #alive=13074/100000, #removed=1541, #clusters=716, diam=3.22e-01
+KMeans round: #alive=11622/100000, #removed=1452, #clusters=640, diam=3.66e-01
+KMeans round: #alive=10433/100000, #removed=1189, #clusters=569, diam=3.61e-01
+KMeans round: #alive=9408/100000, #removed=1025, #clusters=511, diam=3.27e-01
+KMeans round: #alive=8477/100000, #removed=931, #clusters=460, diam=3.88e-01
+KMeans round: #alive=7696/100000, #removed=781, #clusters=415, diam=2.98e-01
+KMeans round: #alive=6948/100000, #removed=748, #clusters=377, diam=3.85e-01
+KMeans round: #alive=6270/100000, #removed=678, #clusters=340, diam=4.30e-01
+KMeans round: #alive=5697/100000, #removed=573, #clusters=307, diam=4.06e-01
+KMeans round: #alive=5162/100000, #removed=535, #clusters=279, diam=5.27e-01
+KMeans round: #alive=4695/100000, #removed=467, #clusters=252, diam=5.23e-01
+Greedy round: #alive=4500/100000, #removed=1, best diam=2.02e-01
+Greedy round: #alive=4000/100000, #removed=1, best diam=2.24e-01
+Greedy round: #alive=3500/100000, #removed=1, best diam=2.40e-01
+Greedy round: #alive=3000/100000, #removed=1, best diam=2.61e-01
+Greedy round: #alive=2500/100000, #removed=1, best diam=2.83e-01
+Greedy round: #alive=2000/100000, #removed=1, best diam=3.13e-01
+Greedy round: #alive=1500/100000, #removed=1, best diam=3.55e-01
+Greedy round: #alive=1000/100000, #removed=1, best diam=4.19e-01
+Greedy round: #alive=500/100000, #removed=1, best diam=5.65e-01
+Compression completed. d=100000 -> d'=500
+Epoch 1/50. Train loss: 1.915e-01, test loss: 1.614e-01
+Epoch 2/50. Train loss: 1.830e-01, test loss: 1.606e-01
+Epoch 3/50. Train loss: 1.817e-01, test loss: 1.608e-01
+Epoch 4/50. Train loss: 1.815e-01, test loss: 1.611e-01
+Epoch 5/50. Train loss: 1.819e-01, test loss: 1.614e-01
+Epoch 6/50. Train loss: 1.822e-01, test loss: 1.616e-01
+Epoch 7/50. Train loss: 1.810e-01, test loss: 1.618e-01
+Epoch 8/50. Train loss: 1.812e-01, test loss: 1.619e-01
+Epoch 9/50. Train loss: 1.809e-01, test loss: 1.619e-01
+Epoch 10/50. Train loss: 1.814e-01, test loss: 1.619e-01
+Epoch 11/50. Train loss: 1.815e-01, test loss: 1.620e-01
+Epoch 12/50. Train loss: 1.806e-01, test loss: 1.620e-01
+Epoch 13/50. Train loss: 1.819e-01, test loss: 1.621e-01
+Epoch 14/50. Train loss: 1.815e-01, test loss: 1.622e-01
+Epoch 15/50. Train loss: 1.805e-01, test loss: 1.622e-01
+Epoch 16/50. Train loss: 1.801e-01, test loss: 1.621e-01
+Epoch 17/50. Train loss: 1.819e-01, test loss: 1.621e-01
+Epoch 18/50. Train loss: 1.807e-01, test loss: 1.622e-01
+Epoch 19/50. Train loss: 1.822e-01, test loss: 1.622e-01
+Epoch 20/50. Train loss: 1.792e-01, test loss: 1.622e-01
+Epoch 21/50. Train loss: 1.796e-01, test loss: 1.623e-01
+Epoch 22/50. Train loss: 1.822e-01, test loss: 1.623e-01
+Epoch 23/50. Train loss: 1.826e-01, test loss: 1.624e-01
+Epoch 24/50. Train loss: 1.801e-01, test loss: 1.622e-01
+Epoch 25/50. Train loss: 1.795e-01, test loss: 1.623e-01
+Epoch 26/50. Train loss: 1.798e-01, test loss: 1.623e-01
+Epoch 27/50. Train loss: 1.798e-01, test loss: 1.623e-01
+Epoch 28/50. Train loss: 1.809e-01, test loss: 1.624e-01
+Epoch 29/50. Train loss: 1.815e-01, test loss: 1.624e-01
+Epoch 30/50. Train loss: 1.792e-01, test loss: 1.623e-01
+Epoch 31/50. Train loss: 1.810e-01, test loss: 1.623e-01
+Epoch 32/50. Train loss: 1.806e-01, test loss: 1.623e-01
+Epoch 33/50. Train loss: 1.802e-01, test loss: 1.623e-01
+Epoch 34/50. Train loss: 1.807e-01, test loss: 1.624e-01
+Epoch 35/50. Train loss: 1.803e-01, test loss: 1.625e-01
+Epoch 36/50. Train loss: 1.809e-01, test loss: 1.624e-01
+Epoch 37/50. Train loss: 1.815e-01, test loss: 1.625e-01
+Epoch 38/50. Train loss: 1.808e-01, test loss: 1.624e-01
+Epoch 39/50. Train loss: 1.803e-01, test loss: 1.624e-01
+Epoch 40/50. Train loss: 1.807e-01, test loss: 1.624e-01
+Epoch 41/50. Train loss: 1.812e-01, test loss: 1.624e-01
+Epoch 42/50. Train loss: 1.797e-01, test loss: 1.624e-01
+Epoch 43/50. Train loss: 1.800e-01, test loss: 1.624e-01
+Epoch 44/50. Train loss: 1.806e-01, test loss: 1.624e-01
+Epoch 45/50. Train loss: 1.796e-01, test loss: 1.625e-01
+Epoch 46/50. Train loss: 1.803e-01, test loss: 1.624e-01
+Epoch 47/50. Train loss: 1.794e-01, test loss: 1.624e-01
+Epoch 48/50. Train loss: 1.808e-01, test loss: 1.624e-01
+Epoch 49/50. Train loss: 1.804e-01, test loss: 1.624e-01
+Epoch 50/50. Train loss: 1.806e-01, test loss: 1.623e-01
+Epoch 1/50. Train loss: 1.903e-01, test loss: 1.612e-01
+Epoch 2/50. Train loss: 1.819e-01, test loss: 1.607e-01
+Epoch 3/50. Train loss: 1.811e-01, test loss: 1.609e-01
+Epoch 4/50. Train loss: 1.817e-01, test loss: 1.611e-01
+Epoch 5/50. Train loss: 1.830e-01, test loss: 1.613e-01
+Epoch 6/50. Train loss: 1.825e-01, test loss: 1.615e-01
+Epoch 7/50. Train loss: 1.794e-01, test loss: 1.617e-01
+Epoch 8/50. Train loss: 1.815e-01, test loss: 1.619e-01
+Epoch 9/50. Train loss: 1.816e-01, test loss: 1.620e-01
+Epoch 10/50. Train loss: 1.803e-01, test loss: 1.621e-01
+Epoch 11/50. Train loss: 1.809e-01, test loss: 1.621e-01
+Epoch 12/50. Train loss: 1.807e-01, test loss: 1.621e-01
+Epoch 13/50. Train loss: 1.802e-01, test loss: 1.621e-01
+Epoch 14/50. Train loss: 1.808e-01, test loss: 1.622e-01
+Epoch 15/50. Train loss: 1.809e-01, test loss: 1.621e-01
+Epoch 16/50. Train loss: 1.808e-01, test loss: 1.621e-01
+Epoch 17/50. Train loss: 1.819e-01, test loss: 1.621e-01
+Epoch 18/50. Train loss: 1.809e-01, test loss: 1.621e-01
+Epoch 19/50. Train loss: 1.815e-01, test loss: 1.621e-01
+Epoch 20/50. Train loss: 1.796e-01, test loss: 1.621e-01
+Epoch 21/50. Train loss: 1.801e-01, test loss: 1.623e-01
+Epoch 22/50. Train loss: 1.802e-01, test loss: 1.622e-01
+Epoch 23/50. Train loss: 1.814e-01, test loss: 1.623e-01
+Epoch 24/50. Train loss: 1.819e-01, test loss: 1.624e-01
+Epoch 25/50. Train loss: 1.795e-01, test loss: 1.624e-01
+Epoch 26/50. Train loss: 1.808e-01, test loss: 1.624e-01
+Epoch 27/50. Train loss: 1.802e-01, test loss: 1.624e-01
+Epoch 28/50. Train loss: 1.809e-01, test loss: 1.624e-01
+Epoch 29/50. Train loss: 1.810e-01, test loss: 1.624e-01
+Epoch 30/50. Train loss: 1.803e-01, test loss: 1.623e-01
+Epoch 31/50. Train loss: 1.812e-01, test loss: 1.625e-01
+Epoch 32/50. Train loss: 1.797e-01, test loss: 1.625e-01
+Epoch 33/50. Train loss: 1.798e-01, test loss: 1.626e-01
+Epoch 34/50. Train loss: 1.813e-01, test loss: 1.625e-01
+Epoch 35/50. Train loss: 1.814e-01, test loss: 1.625e-01
+Epoch 36/50. Train loss: 1.814e-01, test loss: 1.625e-01
+Epoch 37/50. Train loss: 1.796e-01, test loss: 1.625e-01
+Epoch 38/50. Train loss: 1.808e-01, test loss: 1.625e-01
+Epoch 39/50. Train loss: 1.797e-01, test loss: 1.625e-01
+Epoch 40/50. Train loss: 1.791e-01, test loss: 1.626e-01
+Epoch 41/50. Train loss: 1.801e-01, test loss: 1.624e-01
+Epoch 42/50. Train loss: 1.809e-01, test loss: 1.625e-01
+Epoch 43/50. Train loss: 1.820e-01, test loss: 1.625e-01
+Epoch 44/50. Train loss: 1.799e-01, test loss: 1.625e-01
+Epoch 45/50. Train loss: 1.792e-01, test loss: 1.625e-01
+Epoch 46/50. Train loss: 1.803e-01, test loss: 1.626e-01
+Epoch 47/50. Train loss: 1.811e-01, test loss: 1.625e-01
+Epoch 48/50. Train loss: 1.803e-01, test loss: 1.627e-01
+Epoch 49/50. Train loss: 1.806e-01, test loss: 1.626e-01
+Epoch 50/50. Train loss: 1.785e-01, test loss: 1.627e-01
+Epoch 1/50. Train loss: 1.834e-01, test loss: 1.611e-01
+Epoch 2/50. Train loss: 1.755e-01, test loss: 1.607e-01
+Epoch 3/50. Train loss: 1.738e-01, test loss: 1.610e-01
+Epoch 4/50. Train loss: 1.733e-01, test loss: 1.610e-01
+Epoch 5/50. Train loss: 1.740e-01, test loss: 1.612e-01
+Epoch 6/50. Train loss: 1.729e-01, test loss: 1.613e-01
+Epoch 7/50. Train loss: 1.735e-01, test loss: 1.616e-01
+Epoch 8/50. Train loss: 1.733e-01, test loss: 1.617e-01
+Epoch 9/50. Train loss: 1.724e-01, test loss: 1.617e-01
+Epoch 10/50. Train loss: 1.737e-01, test loss: 1.619e-01
+Epoch 11/50. Train loss: 1.732e-01, test loss: 1.621e-01
+Epoch 12/50. Train loss: 1.724e-01, test loss: 1.621e-01
+Epoch 13/50. Train loss: 1.749e-01, test loss: 1.620e-01
+Epoch 14/50. Train loss: 1.732e-01, test loss: 1.621e-01
+Epoch 15/50. Train loss: 1.714e-01, test loss: 1.622e-01
+Epoch 16/50. Train loss: 1.734e-01, test loss: 1.621e-01
+Epoch 17/50. Train loss: 1.738e-01, test loss: 1.623e-01
+Epoch 18/50. Train loss: 1.726e-01, test loss: 1.621e-01
+Epoch 19/50. Train loss: 1.740e-01, test loss: 1.622e-01
+Epoch 20/50. Train loss: 1.730e-01, test loss: 1.623e-01
+Epoch 21/50. Train loss: 1.731e-01, test loss: 1.625e-01
+Epoch 22/50. Train loss: 1.743e-01, test loss: 1.623e-01
+Epoch 23/50. Train loss: 1.714e-01, test loss: 1.622e-01
+Epoch 24/50. Train loss: 1.713e-01, test loss: 1.623e-01
+Epoch 25/50. Train loss: 1.729e-01, test loss: 1.623e-01
+Epoch 26/50. Train loss: 1.730e-01, test loss: 1.624e-01
+Epoch 27/50. Train loss: 1.721e-01, test loss: 1.624e-01
+Epoch 28/50. Train loss: 1.718e-01, test loss: 1.626e-01
+Epoch 29/50. Train loss: 1.710e-01, test loss: 1.625e-01
+Epoch 30/50. Train loss: 1.717e-01, test loss: 1.625e-01
+Epoch 31/50. Train loss: 1.720e-01, test loss: 1.625e-01
+Epoch 32/50. Train loss: 1.724e-01, test loss: 1.623e-01
+Epoch 33/50. Train loss: 1.718e-01, test loss: 1.624e-01
+Epoch 34/50. Train loss: 1.714e-01, test loss: 1.624e-01
+Epoch 35/50. Train loss: 1.711e-01, test loss: 1.625e-01
+Epoch 36/50. Train loss: 1.715e-01, test loss: 1.625e-01
+Epoch 37/50. Train loss: 1.713e-01, test loss: 1.624e-01
+Epoch 38/50. Train loss: 1.726e-01, test loss: 1.627e-01
+Epoch 39/50. Train loss: 1.717e-01, test loss: 1.625e-01
+Epoch 40/50. Train loss: 1.715e-01, test loss: 1.624e-01
+Epoch 41/50. Train loss: 1.717e-01, test loss: 1.625e-01
+Epoch 42/50. Train loss: 1.719e-01, test loss: 1.626e-01
+Epoch 43/50. Train loss: 1.707e-01, test loss: 1.625e-01
+Epoch 44/50. Train loss: 1.726e-01, test loss: 1.624e-01
+Epoch 45/50. Train loss: 1.703e-01, test loss: 1.626e-01
+Epoch 46/50. Train loss: 1.710e-01, test loss: 1.625e-01
+Epoch 47/50. Train loss: 1.705e-01, test loss: 1.624e-01
+Epoch 48/50. Train loss: 1.727e-01, test loss: 1.624e-01
+Epoch 49/50. Train loss: 1.708e-01, test loss: 1.625e-01
+Epoch 50/50. Train loss: 1.723e-01, test loss: 1.625e-01

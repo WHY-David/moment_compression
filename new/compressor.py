@@ -222,7 +222,7 @@ class Compressor:
             warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
             dstop = Nmk
 
-        method = 'kmeans' if self.alive.size>dstop+5000 else 'greedy'
+        method = 'kmeans' if self.alive.size>dstop+3000 else 'greedy'
         if method == 'greedy':
             self._build_index()
 
