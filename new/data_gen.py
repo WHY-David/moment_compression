@@ -5,23 +5,11 @@ from typing import Optional, Union
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (needed for 3D projection side-effects)
 
-from common import fix_random_seed
+from common import fix_random_seed, TwoLayerNet
 
 ArrayLike = Union[np.ndarray, torch.Tensor, float, int]
 Tensor = torch.Tensor
 
-class Sin(nn.Module):
-    def forward(self, x):
-        return torch.sin(2*torch.pi*20*x)
-
-class TwoLayerNet(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
-        super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.act = nn.GELU()
-        self.fc2 = nn.Linear(hidden_dim, 1)
-    def forward(self, x):
-        return self.fc2(self.act(self.fc1(x)))
 
 def _infer_device(x: ArrayLike, y: ArrayLike) -> torch.device:
     """Pick a sensible device given possible torch inputs; default to CPU."""

@@ -57,7 +57,7 @@ def compute_loss(net, loader, loss_fn):
 def bptrain(train_loader, test_loader, hidden_dim, epochs, lr):
     net = TwoLayerNet(2,hidden_dim).to(device)
     loss_fn = nn.MSELoss()
-    opt = torch.optim.SGD(net.parameters(), lr=lr)
+    opt = torch.optim.Adam(net.parameters(), lr=lr)
 
     train_losses = [compute_loss(net, train_loader, loss_fn)]
     test_losses = [compute_loss(net, test_loader, loss_fn)]
@@ -85,16 +85,16 @@ def bptrain(train_loader, test_loader, hidden_dim, epochs, lr):
 
 if __name__ == "__main__":
     d = 100_000
-    dstop = 500
+    dstop = 5000
     k = 3
     test_size = 10_000
     hidden_dim = 200
-    lr = 1e-3
-    epochs = 100
+    lr = 1e-5
+    epochs = 30
     batch_size = d
     seed = 42
 
-    train_data = generate_train_data(d, noise=0.0, seed=seed, return_tensor=False, device=device)
+    train_data = generate_train_data(d, noise=0.0, seed=seed**2, return_tensor=False, device=device)
     cp = Compressor(train_data)
     c_, train_cp = cp.compress(3, dstop=dstop, print_progress=True)
     print(f"Compression completed. d={d} -> d'={dstop}")
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     # final adjustments to the plot
     axs[0].set_yscale('log')
     axs[0].set_ylabel('Train MSE')
-    axs[0].grid(True)
+    # axs[0].grid(True)
     axs[0].legend()
     axs[1].set_yscale('log')
     axs[1].set_xlabel('Epoch')

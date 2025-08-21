@@ -9,14 +9,18 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from compressor import Compressor
 
+class Sin(nn.Module):
+    def forward(self, x):
+        return torch.sin(2*torch.pi*20*x)
+
 class TwoLayerNet(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.GELU()
+        self.act = Sin()
         self.fc2 = nn.Linear(hidden_dim, 1)
     def forward(self, x):
-        return self.fc2(self.relu(self.fc1(x)))
+        return self.fc2(self.act(self.fc1(x)))
 
     def clone(self):
         """Return a deep copy of this TwoLayerNet without consuming RNG."""
