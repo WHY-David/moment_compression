@@ -1,10 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp
-from new.compressor import Compressor
-
-import os
 import csv
+
+from data_gen import generate_points_lattice
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from compressor import Compressor
+
+
 
 def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
     d, m = data.shape
@@ -33,7 +39,7 @@ def run_trial(args):
     seed_data = 0
     rng = np.random.default_rng(seed_data + m + d + t)
     x = 2*rng.random((m, 10)) - 1
-    data = 2*rng.random((d, m)) - 1
+    data = generate_points_lattice(d, m, rng)
     orig = f(data, x)
     
     worker = Compressor(data)
@@ -47,16 +53,20 @@ def run_trial(args):
 
 if __name__ == "__main__":
     # parameters
-    # m = 4   # dimension of each point
-    mlist = [1, 2, 3, 4, 5]
-    d_list = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000]
-    k_list = [1, 2, 3, 4, 5, 6]
-    trials_per_d = 20
+    # mlist = [1, 2, 3, 4, 5]
+    # d_list = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000]
+    # k_list = [1, 2, 3, 4, 5, 6]
+    # trials_per_d = 20
+    # num_samples = 10
+    mlist = [1, 2, 3, 4]
+    d_list = [1000, 2000, 4000, 8000, 16000, 32000, 64000]
+    k_list = [1, 2, 3, 4, 5]
+    trials_per_d = 5
     num_samples = 10
 
     tasks = [(m, k, d, t) for m in mlist for k in k_list for d in d_list for t in range(trials_per_d)]
 
-    out_path = "error_list.csv"
+    out_path = "error_uniform.csv"
     file_exists = os.path.exists(out_path)
 
     # Open once and append rows as each trial completes; flush+fsync for durability

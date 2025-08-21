@@ -6,13 +6,14 @@ from torch.utils.data import TensorDataset
 from matplotlib import pyplot as plt
 
 import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from compressor import Compressor
 
 class TwoLayerNet(nn.Module):
     def __init__(self, input_dim, hidden_dim):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
+        self.relu = nn.GELU()
         self.fc2 = nn.Linear(hidden_dim, 1)
     def forward(self, x):
         return self.fc2(self.relu(self.fc1(x)))

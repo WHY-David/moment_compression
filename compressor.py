@@ -1,10 +1,12 @@
 import numpy as np
-import itertools
-from scipy.linalg import null_space
+# import itertools
+# from scipy.linalg import null_space
+from sklearn.cluster import MiniBatchKMeans, AgglomerativeClustering
 import faiss
 import warnings
-from copy import copy
-from tqdm import tqdm
+# from tqdm import tqdm
+from typing import Union, Optional
+from joblib import Parallel, delayed
 
 def multi_exponents(m, k):
     """
@@ -36,18 +38,51 @@ def multi_exponents(m, k):
 def all_moments(w, exps):
     return np.array([np.prod(w**e) for e in exps], dtype=float)
 
+def find_null_vec(A, rng, max_trials=5, ridge = 0., tol=1e-12):
+    z = None
+    if A.shape[1] > 1.5*A.shape[0]:
+        for _ in range(max_trials):
+            # Random probe and projection onto Null(AS):
+            # z = (I - AS^T (AS AS^T + λI)^{-1} AS) r
+            r = rng.standard_normal(A.shape[1])
+            Ar = A @ r
+            G = A @ A.T
+            G_reg = G + ridge * np.eye(G.shape[0])
+            try:
+                y = np.linalg.solve(G_reg, Ar)
+            except np.linalg.LinAlgError:
+                # extremely ill-conditioned: fall back to least squares on the regularized system
+                y = np.linalg.lstsq(G_reg, Ar, rcond=None)[0]
+            z_candidate = r - A.T @ y
+            if not np.any(z_candidate > 0):
+                z_candidate = -z_candidate
+            resid = np.linalg.norm(A @ z_candidate)
+            # accept if we got a reasonably good null vector with some positive entries
+            if np.any(z_candidate > 1e-5) and resid <= tol * (1.0 + np.linalg.norm(Ar)):
+                z = z_candidate
+                break
+
+    if z is None:
+        # Fallback: use SVD to get a null vector
+        _, _, Vh = np.linalg.svd(A, full_matrices=True)
+        z = Vh[-1, :]
+        if not np.any(z > 0):
+            z = -z
+
+    return z
+
 
 class Compressor:
     """
     Moment compression with diameter-aware Carathéodory peeling.
     """
-    def __init__(self, data, weights=None, tol=1e-12, random_state=0, index_type='flat'):
+    def __init__(self, data, weights=None, tol=1e-12, random_state=0):
         self.w_ = np.asarray(data, dtype=float)
         if self.w_.ndim != 2:
             raise ValueError("`data` must be a 2D array of shape (d, m)")
         self.d, self.m = self.w_.shape
 
-        self.index_type = index_type
+        # self.index_type = index_type
         self.tol = tol
         self.rng = np.random.default_rng(random_state)
 
@@ -58,101 +93,12 @@ class Compressor:
             assert len(self.c_) == self.d   
         self.alive = np.nonzero(self.c_ > self.tol)[0]
 
-        # Build initial index
-        if index_type == 'flat':
-            self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
-            self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-        elif index_type == 'ivf':
-            self.index = self._build_ivf_index()
-        else:
-            raise ValueError("index_type must be 'ivf' or 'flat'.")
+    def _build_index(self):
+        self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
+        self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
 
 
-    # # ------------------------ Internal helpers ------------------------
-    # def _build_ivf_index(self):
-    #     """(re)build ivf data from scratch with robust nlist/nprobe and training size"""
-    #     alive_n = int(self.alive.size)
-    #     # choose nlist so avg list occupancy ~100 and satisfy FAISS training rule 39*nlist <= alive_n
-    #     target_occ = 100
-    #     nlist = max(32, min(8192, alive_n // max(1, target_occ)))
-    #     nlist = min(nlist, max(32, alive_n // 39))  # ensure enough train data; shrink nlist if dataset is small
-    #     if nlist < 32:
-    #         nlist = 32
-
-    #     # build quantizer + IVF
-    #     quant = faiss.IndexFlatL2(self.m)
-    #     ivf = faiss.IndexIVFFlat(quant, self.m, int(nlist), faiss.METRIC_L2)
-
-    #     # training sample: at least min(alive_n, 39*nlist)
-    #     train_sz = min(alive_n, 39 * int(nlist))
-    #     if alive_n <= train_sz:
-    #         train_ids = self.alive
-    #     else:
-    #         train_ids = self.rng.choice(self.alive, size=train_sz, replace=False)
-    #     ivf.train(self.w_[train_ids].astype(np.float32))
-
-    #     # wrap in IDMap2 and add alive vectors/ids
-    #     idmap = faiss.IndexIDMap2(ivf)
-    #     idmap.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-
-    #     # choose nprobe ~3% of nlist (bounded)
-    #     nprobe = max(8, min(1024, int(0.03 * nlist)))
-    #     idmap.index.nprobe = nprobe
-    #     return idmap
-    
-    def _build_ivf_index(self):
-        """(re)build IVF data with tunable nlist/nprobe and richer training size."""
-        alive_n = self.alive.size
-
-        # ---- Tunables (safe defaults for d ~ 1e6 in 3D) ----
-        target_occ      = 100          # desired avg points per list
-        nlist_min       = 64           # allow a bit larger floor than 32 when data is big
-        nlist_max       = 32768        # raise cap so 1e6 points can use small cells
-        train_mult_min  = 50           # try to train with >= 50 * nlist points when available
-        train_mult_cap  = 80           # don't exceed 80 * nlist (diminishing returns)
-        nprobe_frac     = 0.03         # baseline nprobe as a fraction of nlist
-        nprobe_min      = 16
-        nprobe_max      = 1024         # hard cap to keep searches fast
-
-        # ---- Choose nlist ----
-        # primary: target per-list occupancy
-        nlist_occ = max(1, alive_n // max(1, target_occ))
-        # training rule: need >= 39 * nlist training points
-        nlist_train = max(1, alive_n // 39)
-        nlist = int(min(max(nlist_min, nlist_occ, nlist_train), nlist_max))
-
-        # ---- Build quantizer + IVF ----
-        quant = faiss.IndexFlatL2(self.m)
-        ivf = faiss.IndexIVFFlat(quant, self.m, nlist, faiss.METRIC_L2)
-
-        # ---- Training set size (richer than bare minimum) ----
-        desired = int(min(train_mult_cap * nlist, alive_n))
-        lower   = int(min(train_mult_min * nlist, alive_n))
-        train_sz = max(lower, min(desired, alive_n))
-        if alive_n <= train_sz:
-            train_ids = self.alive
-        else:
-            train_ids = self.rng.choice(self.alive, size=train_sz, replace=False)
-
-        ivf.train(self.w_[train_ids].astype(np.float32))
-
-        # ---- Add all alive vectors with IDs ----
-        idmap = faiss.IndexIDMap2(ivf)
-        idmap.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-
-        # ---- Baseline nprobe; store for adaptive search ----
-        base_nprobe = int(max(nprobe_min, min(nprobe_max, nprobe_frac * nlist)))
-        base_nprobe = int(min(base_nprobe, nlist))  # cannot exceed nlist
-        idmap.index.nprobe = base_nprobe
-
-        # remember for adaptive probing logic elsewhere
-        self.nprobe_base = base_nprobe
-        self.nlist_current = nlist
-
-        return idmap
-
-
-    def _diameter(self, idx_subset: np.ndarray) -> float:
+    def _diameter(self, idx_subset) -> float:
         Y = self.w_[idx_subset]
         norms = np.sum(Y * Y, axis=1, keepdims=True)
         D2 = norms + norms.T - 2.0 * (Y @ Y.T)
@@ -214,118 +160,119 @@ class Compressor:
             )
         
         return best_diam, best_subset
-        
-    def _reduce1(self, subset):
-        '''
-        Caratheodory peeling
-        Ensure len(subset) = Nmk+1
-        '''
-        # Build D x (D+1) moment matrix for best_subset
-        A = np.empty((len(self.exps), len(subset)), dtype=float)
-        for col, j in enumerate(subset):
-            A[:, col] = all_moments(self.w_[j], self.exps)
 
-        # Null-space direction
-        alpha = null_space(A, rcond=self.tol)[:, 0]
-        if not np.any(alpha > 0):
-            alpha = -alpha
-
-        # Determine maximal step t
-        t = min((self.c_[j] / a_j) for a_j, j in zip(alpha, subset) if a_j > 0)
-
-        # Update weights; update index
-        remove = []
-        for aj, j in zip(alpha, subset):
-            self.c_[j] -= t * aj
-            if self.c_[j] <= self.tol:
-                self.c_[j] = 0.
-                remove.append(j)
-        self.alive = self.alive[~np.isin(self.alive, remove)]
-        self.index.remove_ids(np.array(remove, dtype='int64'))
-
-
-    # ------------------------ Public API ------------------------
-    def compress_weights(self,
-        k: int,
-        dstop=None,                 # stop when d <= dstop; None means dstop = binom(m+k, k)
-        return_at=None,             # None or a list of dstop's
-        candidate_fraction=0.1,     # fraction of alive points used as candidate centers
-        max_candidates: int=5000,
-        overquery: int=5,                # extra neighbors to fetch beyond D+1
-        rebuild_interval: int=2,      # retrain / rebuild when this fraction of ORIGINAL points removed
-        progress_bar=False, 
-        print_progress=True
-        ) -> None | dict:
+    def _reduce(self, subset):
         """
-        Execute the Carathéodory peeling until the active set size ≤ dstop.
-        Returns
-        -------
-        c_ : np.ndarray, shape (N,)
-            Positive weights scaled to sum to 1.
+        This updates index as well. Used in greedy
         """
-        if return_at is not None:
-            outputs = dict()
-            return_list = sorted(list(return_at))
-        if self.index_type == 'ivf':
-            rebuild_threshold = self.d-rebuild_interval
+        _, c = self._reduce_compute(subset)
+        self.c_[subset] = c
+        remove = subset[c < self.tol]
+        if len(remove):
+            self.alive = self.alive[~np.isin(self.alive, remove)]
+            self.index.remove_ids(np.array(remove, dtype=int))
 
-        self.exps = multi_exponents(self.m, k)
-        Nmk = len(self.exps)
+    def _reduce_compute(self, subset):
+        """
+        Pure computation version of _reduce: does not mutate self.c_ or self.alive.
+        Returns (subset, c_updated, remove_indices).
+        Used in parallel
+        """
+        # subset = np.asarray(subset, dtype=int)
+        A = self.all_moments[:, subset]
+        c = self.c_[subset].copy()
+        if np.any(c < -self.tol):
+            raise ValueError("c must be nonnegative (within tolerance).")
+        b = A@c
+        target = A.shape[0]
 
-        # Determine stopping threshold
-        if return_at is not None:
-            dstop = return_list[0]
+        S = np.flatnonzero(c > self.tol).tolist()
+        while len(S) > target:
+            AS = A[:, S]
+            z = find_null_vec(AS, self.rng, tol=self.tol)
+            # update c
+            zpos = z > 0
+            t = np.min((c[S][zpos]) / z[zpos])
+            c[S] -= t * z
+            S = [idx for idx in S if c[idx] > self.tol]
+
+        # sanity check
+        c[c < self.tol] = 0.0
+        diff = np.linalg.norm(A @ c - b)
+        if diff > 1e-8 * (1.0 + np.linalg.norm(b)):
+            warnings.warn(f"||A@c - b|| = {diff:.2e}. Consider increasing accuracy. ")
+
+        return subset, c
+
+
+    def compress(self, 
+                 k:int, # moment matching order
+                 dstop: Optional[int] = None,
+                 print_progress=False
+                 ):
+        exps = multi_exponents(self.m, k)
+        Nmk = len(exps)
+        self.all_moments = np.stack([all_moments(w, exps) for w in self.w_], axis=-1)
+        assert self.all_moments.shape == (Nmk, self.d)
+
+        # determing dstop
         if dstop is None:
             dstop = Nmk
         elif dstop < Nmk:
             warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
             dstop = Nmk
 
-        # progress bar setup
-        if progress_bar:
-            pbar = tqdm(total=self.d, desc="Compressing", unit="pt")
-            prev_alive = self.alive.size
+        method = 'kmeans' if self.alive.size>dstop+1000 else 'greedy'
+        if method == 'greedy':
+            self._build_index()
 
-        # main loop
         while self.alive.size > dstop:
-            best_diam, best_subset = self._find_best_subset(Nmk+1, overquery, candidate_fraction, max_candidates)
-            self._reduce1(best_subset)
+            prev_alive_size = self.alive.size
+            # choose kmeans or greedy automatically
+            if method == 'kmeans':
+                n_clusters = int(min(0.98*self.alive.size / Nmk, 100*dstop/Nmk))
+                mbk = MiniBatchKMeans(n_clusters=n_clusters, max_iter=200, batch_size=4096, random_state=0)
+                labels = mbk.fit_predict(self.w_[self.alive], sample_weight=self.c_[self.alive])
+                # indices within mask
+                clusters = [np.where(labels==j)[0].tolist() for j in range(n_clusters)]
+                # indicies in the original labeling
+                tasks = [self.alive[subset] for subset in clusters if len(subset) > Nmk]
 
-            if return_at is not None:
-                if self.alive.size in return_list:
-                    outputs[self.alive.size] = self.c_.copy()
-                    if print_progress:
-                        print(f'Compress progress: {self.alive.size}/{self.d}')
-            
-            if self.index_type == 'ivf':
-                # switch to flat when alive becomes small
-                if self.alive.size <= 50000:
-                    self.index_type = 'flat'
-                    self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
-                    self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
-                    continue
-                # Rebuild if enough removals accumulated (IVF only)
-                if self.alive.size <= rebuild_threshold:
-                    self.index = self._build_ivf_index()
-                    rebuild_threshold -= rebuild_interval
+                diam = max(self._diameter(subset) for subset in tasks)
 
-            if progress_bar:
-                removed = prev_alive - self.alive.size
-                if removed > 0:
-                    pbar.update(removed)
-                    prev_alive = self.alive.size
-                pbar.set_postfix(best_diam=f"{best_diam:.2e}")
+                # Parallel loop to compress each subset
+                results = Parallel(n_jobs=-1, prefer='threads')(
+                    delayed(self._reduce_compute)(subset) for subset in tasks
+                )
+                # Commit phase: write back weights and update alive/index once
+                to_remove = []
+                for subset, c_new in results:
+                    self.c_[subset] = c_new
+                    remove = subset[c_new < self.tol]
+                    to_remove.extend(remove.tolist())
+                if len(to_remove) != 0:
+                    self.alive = self.alive[~np.isin(self.alive, to_remove)]
 
-        if progress_bar:
-            pbar.close()
-        
-        if return_at is not None:
-            return outputs
+                if print_progress:
+                    print(f"KMeans round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, #clusters={n_clusters}, diam={diam:.2e}")
+                if self.alive.size < 1000 or n_clusters < 50:
+                    method = 'greedy'
+                    self._build_index()
+            elif method == 'greedy':
+                best_diam, best_subset = self._find_best_subset(Nmk+1, overquery=0, candidate_fraction=0.1, max_candidates=5000)
+                assert len(best_subset) == Nmk+1
+                self._reduce(best_subset) # update c and remove pts from index
+                if print_progress and self.alive.size%500==0:
+                    print(f"Greedy round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, best diam={best_diam:.2e}")
+            else:
+                raise RuntimeError("Undefined reduction method")
 
+            if self.alive.size == prev_alive_size:
+                warnings.warn("A round reduced 0 points")
+                if method == 'kmeans':
+                    print("Fall back to sequential greedy reduction")
+                    method = 'greedy'
+                    self._build_index()
+                
 
-    def compress(self, k: int, **kwargs):
-        self.compress_weights(k, **kwargs)
-        c_ = self.c_[self.alive].copy()
-        w_ = self.w_[self.alive, :].copy()
-        return c_, w_
-
+        return self.c_[self.alive].copy(), self.w_[self.alive, :].copy()
