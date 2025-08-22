@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     tasks = [(m, k, d, t) for m in mlist for k in k_list for d in d_list for t in range(trials_per_d)]
 
-    out_path = "error_uniform.csv"
+    out_path = "error_list.csv"
     file_exists = os.path.exists(out_path)
 
     # Open once and append rows as each trial completes; flush+fsync for durability
