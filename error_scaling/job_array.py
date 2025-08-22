@@ -66,8 +66,8 @@ if __name__ == "__main__":
                         help="Dataset size for the single-task mode.")
     parser.add_argument("--trial", type=int, default=None,
                         help="Trial index t for the single-task mode.")
-    parser.add_argument("--out", dest="out_path", default="error_uniform.csv",
-                        help="Output CSV path (default: error_uniform.csv).")
+    parser.add_argument("--out", dest="out_path", default="error_list.csv",
+                        help="Output CSV path (default: error_list.csv).")
 
     args = parser.parse_args()
 
