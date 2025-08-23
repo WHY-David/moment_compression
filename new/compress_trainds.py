@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler, RandomSampler
+from torch.utils.data import TensorDataset, DataLoader
 
 from common import TwoLayerNet, fix_random_seed, make_canvas
 from data_gen import generate_train_data
@@ -14,84 +14,80 @@ from compressor import Compressor
 
 device = torch.device("cpu")
 
-def make_loader(data, num_samples:int, weights=None, batch_size=64):
+def make_loader(data, batch_size=None):
     X = torch.from_numpy(data[:, :2]).float().to(device)      # shape (N, 2) -> (x, y)
     y = torch.from_numpy(data[:, [2]]).float().to(device)     # shape (N, 1) -> f(x, y)
     ds = TensorDataset(X, y)
-    if weights is None:
-        sampler = RandomSampler(
-            data_source=ds,
-            replacement=True,
-            num_samples=num_samples
-        )
-    else:
-        weights_t = torch.tensor(weights, dtype=torch.float, device=device)
-        sampler = WeightedRandomSampler(
-            weights=weights_t,
-            num_samples=num_samples,
-            replacement=True
-        )
-    return DataLoader(
-        ds,
-        batch_size=batch_size,
-        sampler=sampler
-    )
+    if batch_size is None:
+        batch_size = len(ds)  # full-batch
+    # Deterministic order for all cases; no sampler and no shuffling.
+    return DataLoader(ds, batch_size=batch_size, shuffle=False)
 
-def make_test_loader(data, batch_size=64):
-    X = torch.from_numpy(data[:, :2]).float().to(device)      # shape (N, 2) -> (x, y)
-    y = torch.from_numpy(data[:, [2]]).float().to(device)     # shape (N, 1) -> f(x, y)
+def make_test_loader(data, batch_size=None):
+    X = torch.from_numpy(data[:, :2]).float().to(device)      # shape (d, 2) -> (x, y)
+    y = torch.from_numpy(data[:, [2]]).float().to(device)     # shape (d, 1) -> f(x, y)
     ds = TensorDataset(X, y)
-    return DataLoader(ds, batch_size=batch_size)
+    if batch_size is None:
+        batch_size = len(ds)
+    return DataLoader(ds, batch_size=batch_size, shuffle=False)
 
-def compute_loss(net, loader, loss_fn):
+def compute_loss(net, loader, weights=None):
+    """Manual MSE. If weights is None: (1/N) * sum_i ||f(x_i)-y_i||^2.
+    If weights given (length N): (1/sum w_i) * sum_i w_i * ||f(x_i)-y_i||^2.
+    Assumes full-batch DataLoader (one batch) and deterministic ordering.
+    """
     net.eval()
-    total_loss = 0.0
     with torch.no_grad():
-        for inputs, labels in loader:
-            inputs, labels = inputs.to(device), labels.to(device)
+        for inputs, labels in loader:  # single full batch
             outputs = net(inputs)
-            loss = loss_fn(outputs, labels)
-            total_loss += loss.item() * inputs.size(0)
-    return total_loss / len(loader.sampler)
+            sq_err = (outputs - labels).pow(2).squeeze(-1)  # shape (N,)
+            if weights is None:
+                loss = sq_err.mean()
+            else:
+                w = torch.as_tensor(weights, dtype=torch.float, device=inputs.device).view(-1)
+                loss = (w * sq_err).sum() / w.sum()
+            return loss.item()
 
-def bptrain(train_loader, test_loader, hidden_dim, epochs, lr):
-    net = TwoLayerNet(2,hidden_dim).to(device)
-    loss_fn = nn.MSELoss()
-    opt = torch.optim.Adam(net.parameters(), lr=lr)
+def bptrain(train_loader, test_loader, hidden_dim, epochs, lr, train_weights=None):
+    net = TwoLayerNet(2, hidden_dim).to(device)
+    opt = torch.optim.SGD(net.parameters(), lr=lr)
 
-    train_losses = [compute_loss(net, train_loader, loss_fn)]
-    test_losses = [compute_loss(net, test_loader, loss_fn)]
+    # initial losses
+    train_losses = [compute_loss(net, train_loader, weights=train_weights)]
+    test_losses = [compute_loss(net, test_loader, weights=None)]
 
-    # Training loop
-    for epoch in range(1, epochs+1):
+    for epoch in range(1, epochs + 1):
         net.train()
-        # total_loss = 0
-        for inputs, labels in train_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
+        for inputs, labels in train_loader:  # single full batch
             opt.zero_grad()
             outputs = net(inputs)
-            loss = loss_fn(outputs, labels)
+            sq_err = (outputs - labels).pow(2).squeeze(-1)
+            if train_weights is None:
+                loss = sq_err.mean()
+            else:
+                w = torch.as_tensor(train_weights, dtype=torch.float, device=inputs.device).view(-1)
+                loss = (w * sq_err).sum() / w.sum()
             loss.backward()
             opt.step()
-            # total_loss += loss.item() * inputs.size(0)
-        # train_loss = total_loss / len(train_loader.sampler)
-        train_loss = compute_loss(net, train_loader, loss_fn)
+
+        # record losses after the update
+        train_loss = compute_loss(net, train_loader, weights=train_weights)
+        test_loss = compute_loss(net, test_loader, weights=None)
         train_losses.append(train_loss)
-        test_loss = compute_loss(net, test_loader, loss_fn)
         test_losses.append(test_loss)
         print(f"Epoch {epoch}/{epochs}. Train loss: {train_loss:.3e}, test loss: {test_loss:.3e}")
 
     return train_losses, test_losses
 
 if __name__ == "__main__":
-    d = 100_000
-    dstop = 5000
+    d = 50_000
+    dstop = 10_000
     k = 3
     test_size = 10_000
     hidden_dim = 200
-    lr = 1e-5
-    epochs = 30
-    batch_size = d
+    lr = 2e-3
+    epochs = 100
+    batch_size = None
     seed = 42
 
     train_data = generate_train_data(d, noise=0.0, seed=seed**2, return_tensor=False, device=device)
@@ -101,9 +97,9 @@ if __name__ == "__main__":
     train_naive = train_data[:dstop, :]
     test_data = generate_train_data(d, noise=0.0, seed=seed*10, return_tensor=False, device=device)
 
-    train_loader = make_loader(train_data, d, batch_size=batch_size)
-    train_loader_cp = make_loader(train_cp, d, weights=c_, batch_size=batch_size)
-    train_loader_naive = make_loader(train_naive, d, batch_size=batch_size)
+    train_loader = make_loader(train_data, batch_size=batch_size)
+    train_loader_cp = make_loader(train_cp, batch_size=batch_size)
+    train_loader_naive = make_loader(train_naive, batch_size=batch_size)
     test_loader = make_test_loader(test_data, batch_size=batch_size)
 
     # plots
@@ -112,21 +108,21 @@ if __name__ == "__main__":
 
     # train on the full data
     fix_random_seed(seed)
-    train_losses, test_losses = bptrain(train_loader, test_loader, hidden_dim, epochs, lr)
-    axs[0].plot(epochs_range, train_losses, marker='o', label=f"d={d}")
-    axs[1].plot(epochs_range, test_losses, marker='o', label=f"d={d}")
+    train_losses, test_losses = bptrain(train_loader, test_loader, hidden_dim, epochs, lr, train_weights=None)
+    axs[0].plot(epochs_range, train_losses, marker='o', markersize=3, label=f"d={d}")
+    axs[1].plot(epochs_range, test_losses, marker='o', markersize=3, label=f"d={d}")
 
-    # train on compressed data
+    # train on compressed data (weighted loss)
     fix_random_seed(seed)
-    train_losses, test_losses = bptrain(train_loader_cp, test_loader, hidden_dim, epochs, lr)
-    axs[0].plot(epochs_range, train_losses, marker='o', label=f"cp d={dstop}")
-    axs[1].plot(epochs_range, test_losses, marker='o', label=f"cp d={dstop}")
+    train_losses, test_losses = bptrain(train_loader_cp, test_loader, hidden_dim, epochs, lr, train_weights=c_)
+    axs[0].plot(epochs_range, train_losses, marker='o', markersize=3, label=f"cp d={dstop}")
+    axs[1].plot(epochs_range, test_losses, marker='o', markersize=3, label=f"cp d={dstop}")
 
-    # train on naive subset
+    # train on naive subset (unweighted loss)
     fix_random_seed(seed)
-    train_losses, test_losses = bptrain(train_loader_naive, test_loader, hidden_dim, epochs, lr)
-    axs[0].plot(epochs_range, train_losses, marker='o', label=f"d={dstop}")
-    axs[1].plot(epochs_range, test_losses, marker='o', label=f"d={dstop}")
+    train_losses, test_losses = bptrain(train_loader_naive, test_loader, hidden_dim, epochs, lr, train_weights=None)
+    axs[0].plot(epochs_range, train_losses, marker='o', markersize=3, label=f"d={dstop}")
+    axs[1].plot(epochs_range, test_losses, marker='o', markersize=3, label=f"d={dstop}")
 
     # final adjustments to the plot
     axs[0].set_yscale('log')

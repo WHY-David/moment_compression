@@ -208,6 +208,7 @@ class Compressor:
     def compress(self, 
                  k:int, # moment matching order
                  dstop: Optional[int] = None,
+                 greedy_threshold: int = 2000,
                  print_progress=False
                  ):
         exps = multi_exponents(self.m, k)
@@ -222,7 +223,7 @@ class Compressor:
             warnings.warn("dstop can't be smaller than binom(m+k, k); setting dstop = binom(m+k, k)")
             dstop = Nmk
 
-        method = 'kmeans' if self.alive.size>dstop+1000 else 'greedy'
+        method = 'kmeans' if self.alive.size>dstop+greedy_threshold else 'greedy'
         if method == 'greedy':
             self._build_index()
 
@@ -255,7 +256,7 @@ class Compressor:
 
                 if print_progress:
                     print(f"KMeans round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, #clusters={n_clusters}, diam={diam:.2e}")
-                if self.alive.size < 1000 or n_clusters < 50:
+                if self.alive.size < dstop+greedy_threshold or n_clusters < 50:
                     method = 'greedy'
                     self._build_index()
             elif method == 'greedy':
