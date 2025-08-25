@@ -95,7 +95,7 @@ class Compressor:
 
     def _build_index(self):
         self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
-        self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
+        self.index.add_with_ids(self.w_[self.alive], self.alive)
 
 
     def _diameter(self, idx_subset) -> float:
@@ -153,7 +153,7 @@ class Compressor:
                 print("[fallback] IVF search failed to find a viable subset; switching to Flat (IndexFlatL2) and retrying once.")
                 self.index_type = 'flat'
                 self.index = faiss.IndexIDMap2(faiss.IndexFlatL2(self.m))
-                self.index.add_with_ids(self.w_[self.alive].astype(np.float32), self.alive)
+                self.index.add_with_ids(self.w_[self.alive], self.alive)
                 return self._find_best_subset(target_size, overquery, candidate_fraction, max_candidates)
             raise RuntimeError(
                 "Failed to find a viable subset of the requested size among alive points; "

@@ -19,17 +19,6 @@ def _infer_device(x: ArrayLike, y: ArrayLike) -> torch.device:
         return y.device
     return torch.device("cpu")
 
-
-def _to_tensor(x: ArrayLike, device: Optional[torch.device] = None, dtype=torch.float32) -> Tensor:
-    """Convert numpy/float/int/torch to a torch.Tensor on `device` without copying if possible."""
-    if isinstance(x, torch.Tensor):
-        t = x.to(dtype)
-        if device is not None:
-            t = t.to(device)
-        return t
-    return torch.as_tensor(x, dtype=dtype, device=device)
-
-
 def f(
     x: ArrayLike,
     y: ArrayLike,
@@ -44,9 +33,8 @@ def f(
     Inputs `x` and `y` can be scalars, numpy arrays, or torch.Tensors of the same shape.
     Returns a torch.Tensor by default, or a numpy array if `return_numpy=True`.
     """
-    fix_random_seed(seed)
-
     if net is None:
+        fix_random_seed(seed)
         net = TwoLayerNet(2, 200)
 
     if device is None:
@@ -55,11 +43,9 @@ def f(
     net = net.to(device).eval()
 
     with torch.no_grad():
-        xt = _to_tensor(x, device=device).reshape(-1)
-        yt = _to_tensor(y, device=device).reshape(-1)
-        if xt.shape != yt.shape:
-            raise ValueError(f"x and y must have the same shape; got {xt.shape} vs {yt.shape}")
-        inp = torch.stack((xt, yt), dim=1)  # (N, 2)
+        if x.shape != y.shape:
+            raise ValueError(f"x and y must have the same shape; got {x.shape} vs {y.shape}")
+        inp = torch.stack((x, y), dim=1)  # (N, 2)
         out = net(inp).squeeze(-1)  # (N,)
 
     if return_numpy:
@@ -69,7 +55,7 @@ def f(
 
 def generate_train_data(
     size: int,
-    func=f,
+    net=None,
     noise: float = 0.0,
     seed: int = 0,
     return_tensor: bool = False,
@@ -91,7 +77,9 @@ def generate_train_data(
     y = torch.rand(size, device=device, dtype=torch.float32)
 
     # model output
-    fv = func(x, y, seed=seed, device=device, return_numpy=False)  # (size,)
+    if net is None:
+        net = TwoLayerNet(2, 200).to(device)
+    fv = f(x, y, net=net, device=device, return_numpy=False)  # (size,)
 
     # add Gaussian noise
     if noise and noise > 0:

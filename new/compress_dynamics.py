@@ -5,10 +5,17 @@ from torch.utils.data import TensorDataset, DataLoader
 from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 
-from common import TwoLayerNet, WeightedTwoLayerNet, compress_nn, fix_random_seed, load_data
+from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas
+from data_gen import generate_train_data
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from compressor import Compressor
 
 # Device configuration
-device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+# device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+device = torch.device('cpu')
 
 
 def make_loader(dataset, batch_size=64, seed=0):
@@ -21,64 +28,114 @@ def make_loader(dataset, batch_size=64, seed=0):
     loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler, drop_last=False)
     return loader
 
+def compute_loss(net, loader, loss_fn=nn.MSELoss()):
+    """
+    Evaluate average loss over `loader` without altering the caller's train/eval mode.
+    """
+    was_training = net.training  # remember current mode
+    net.eval()
+    total_loss = 0.0
+    total_count = 0
+    with torch.no_grad():
+        for inputs, labels in loader:
+            inputs = inputs.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
+            outputs = net(inputs)
+            loss = loss_fn(outputs, labels)
+            bsz = inputs.size(0)
+            total_loss += loss.item() * bsz
+            total_count += bsz
+    # restore original mode
+    if was_training:
+        net.train()
+    else:
+        net.eval()
+    return total_loss / total_count
 
-def train_orig(net, dataset, epochs=5, batch_size=64, lr=0.01, seed=0, algo=torch.optim.SGD):
-    """training of the baseline network. Returns snapshots per epoch (including epoch 0)."""
+def train_orig(net: TwoLayerNet,
+               train_ds: TensorDataset,
+               test_ds: TensorDataset,
+               epochs=5,
+               batch_size=64,
+               lr=0.01,
+               seed=0,
+               algo=torch.optim.SGD):
+    """Train the baseline network. Returns (train_losses, test_losses) with snapshots per epoch (incl. epoch 0)."""
     fix_random_seed(seed)
-    loader = make_loader(dataset, batch_size=batch_size, seed=seed)
-    criterion = nn.MSELoss()
+    train_loader = make_loader(train_ds, batch_size=batch_size, seed=seed)
+    test_loader = make_loader(test_ds, batch_size=batch_size, seed=seed)
+    loss_fn = nn.MSELoss()
     opt = algo(net.parameters(), lr=lr)
 
-    snapshots = [net.clone()]  # epoch 0 (untrained)
+    # Initial evaluation (does not change mode due to compute_loss restoration)
+    train_losses = [compute_loss(net, train_loader, loss_fn)]
+    test_losses = [compute_loss(net, test_loader, loss_fn)]
+
     for epoch in range(epochs):
-        for x, y in loader:
-            opt.zero_grad()
-            loss = criterion(net(x), y)
+        # ensure we're in training mode (compute_loss may have put us in eval temporarily)
+        net.train()
+        for x, y in train_loader:
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
+            opt.zero_grad(set_to_none=True)
+            loss = loss_fn(net(x), y)
             loss.backward()
             opt.step()
-        snapshots.append(net.clone())
-        if (epoch+1)%20 == 0:
+
+        # End-of-epoch evaluation (compute_loss preserves/restores mode)
+        train_losses.append(compute_loss(net, train_loader, loss_fn))
+        test_losses.append(compute_loss(net, test_loader, loss_fn))
+        if (epoch + 1) % 10 == 0:
             print(f"Epoch {epoch+1}/{epochs} completed")
-    return snapshots
+    return train_losses, test_losses
 
 
-def train_weighted(net_w: WeightedTwoLayerNet,
-                   dataset, epochs=5, batch_size=64, lr=0.01, seed=0, algo=torch.optim.SGD):
-    """
-    Train with the custom rule:
-      - b2 uses standard SGD/Adam step
-      - For j in alive: W1_j, W2_j, b1_j use w <- w - (lr / c_j) * grad
-      - For j not in alive: no update
-    Returns snapshots per epoch (including epoch 0).
-    """
+def train_weighted(net: WeightedTwoLayerNet,
+               train_ds: TensorDataset,
+               test_ds: TensorDataset,
+               epochs=5,
+               batch_size=64,
+               lr=0.01,
+               seed=0,
+               algo=torch.optim.SGD):
     fix_random_seed(seed)
-    loader = make_loader(dataset, batch_size=batch_size, seed=seed)
-    criterion = nn.MSELoss()
+    train_loader = make_loader(train_ds, batch_size=batch_size, seed=seed)
+    test_loader = make_loader(test_ds, batch_size=batch_size, seed=seed)
+    loss_fn = nn.MSELoss()
+    opt = algo(net.parameters(), lr=lr)
 
-    weights_t = net_w.weights
-    # lr_scale = 1/c_j for alive, 0 for dead
+    weights_t = net.weights
     inv_c = torch.where(weights_t > tol,
                         1.0 / weights_t,
                         torch.zeros_like(weights_t))
 
-    # Scale per-element gradients via hooks; keeps using stock SGD
-    net_w.fc1.weight.register_hook(lambda grad: grad * inv_c.view(-1, 1))
-    net_w.fc1.bias.register_hook(lambda grad: grad * inv_c)
-    net_w.fc2.weight.register_hook(lambda grad: grad * inv_c.view(1, -1))
+    # Scale per-element gradients via hooks
+    net.fc1.weight.register_hook(lambda grad: grad * inv_c.view(-1, 1))
+    net.fc1.bias.register_hook(lambda grad: grad * inv_c)
+    net.fc2.weight.register_hook(lambda grad: grad * inv_c.view(1, -1))
 
-    opt = algo(net_w.parameters(), lr=lr)
+    # Initial evaluation (does not change mode due to compute_loss restoration)
+    train_losses = [compute_loss(net, train_loader, loss_fn)]
+    test_losses = [compute_loss(net, test_loader, loss_fn)]
 
-    snapshots = [net_w.clone()]
     for epoch in range(epochs):
-        for x, y in loader:
-            opt.zero_grad()
-            loss = criterion(net_w(x), y)
+        # ensure we're in training mode (compute_loss may have put us in eval temporarily)
+        net.train()
+        for x, y in train_loader:
+            x = x.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
+            opt.zero_grad(set_to_none=True)
+            loss = loss_fn(net(x), y)
             loss.backward()
             opt.step()
-        snapshots.append(net_w.clone())
-        if (epoch+1)%20 == 0:
+
+        # End-of-epoch evaluation (compute_loss preserves/restores mode)
+        train_losses.append(compute_loss(net, train_loader, loss_fn))
+        test_losses.append(compute_loss(net, test_loader, loss_fn))
+        if (epoch + 1) % 10 == 0:
             print(f"Epoch {epoch+1}/{epochs} completed")
-    return snapshots
+    return train_losses, test_losses
+
 
 
 def naive_prune(net_orig:TwoLayerNet, hidden_dim:int):
@@ -106,81 +163,65 @@ def naive_prune(net_orig:TwoLayerNet, hidden_dim:int):
     
 
 
-def compute_loss(net, loader, loss_fn=nn.MSELoss()):
-    net.eval()
-    total_loss = 0.0
-    with torch.no_grad():
-        for inputs, labels in loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = net(inputs)
-            loss = loss_fn(outputs, labels)
-            total_loss += loss.item() * inputs.size(0)
-    return total_loss / len(loader.sampler)
-
-
 if __name__ == '__main__':
     # Determinism
     seed = 42
     fix_random_seed(seed)
 
     # Hyperparameters
-    d = 2000
-    dstop = 200
+    d = 10000
+    dstop = 1000
     k = 3
+    train_size = 100_000
+    test_size = train_size
     tol = 1e-12
     lr = 0.0001
     epochs = 50
-    batch_size = 64
+    batch_size = 1024
     algo = torch.optim.Adam
 
     # TensorDataset
-    dataset = load_data()
+    net_truth = TwoLayerNet(input_dim=2, hidden_dim=d).to(device)
+    train_data = generate_train_data(train_size, net=net_truth, noise=0.5, seed=seed**2, return_tensor=True, device=device)
+    train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
+    test_data = generate_train_data(test_size, net=net_truth, noise=0.0, seed=seed**3, return_tensor=True, device=device)
+    test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
     # 1) Original network
-    net_orig = TwoLayerNet(input_dim=1, hidden_dim=d).to(device)
-
-    # 2) Build weighted (compressed) network using Compressor-derived weights
+    net_orig = TwoLayerNet(input_dim=2, hidden_dim=d).to(device)
     net_cp, weights_t = compress_nn(net_orig, dstop=dstop, k=k, tol=tol)
-    # print(weights_t.min().item())
     print(f'Compression completed. d={d} -> dstop={dstop}')
     net_naive = naive_prune(net_orig, dstop)
 
-    # 3) Train both with identical minibatches/order
-    snaps_naive = train_orig(net_naive, dataset, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
-    snaps_orig = train_orig(net_orig, dataset, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
-    snaps_cp   = train_weighted(net_cp, weights_t, dataset, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
-
-    losses_naive = [calculate_MSE(net) for net in snaps_naive]
-    losses_orig  = [calculate_MSE(net) for net in snaps_orig]
-    losses_cp    = [calculate_MSE(net) for net in snaps_cp]
-
-    # 4) Compare predictions per epoch
-    diffs = [pred_dif(s_o, s_c, n=20) for s_o, s_c in zip(snaps_orig, snaps_cp)]
-    pred1 = [pred(net) for net in snaps_orig]
-    pred2 = [pred(net) for net in snaps_cp]
-    pred_naive = [pred(net) for net in snaps_naive]
+    # 3) Train all cases with identical minibatches/order
+    train_loss_orig, test_loss_orig = train_orig(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
+    train_loss_cp, test_loss_cp = train_weighted(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
+    train_loss_naive, test_loss_naive = train_orig(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
 
     # 5) Plot: three subplots
-    fig, axs = plt.subplots(2, 1, figsize=(6, 6), sharex=True)
-    # ensure Helvetica font at size 8 for all ticks
-    for ax in axs:
-        ax.tick_params(axis='both', which='major', labelsize=8)
+    fig, axs = make_canvas(rows=2, cols=1)
+    epoch_range = list(range(epochs+1))
 
-    # Plot Train Loss vs. epoch (log scale)
-    axs[0].plot(range(0, epochs + 1), losses_naive, color='tab:blue',  marker='d', markersize=6, label=f'Naive d\'={dstop}')
-    axs[0].plot(range(0, epochs + 1), losses_orig,  color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
-    axs[0].plot(range(0, epochs + 1), losses_cp,    color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
-    axs[0].set_ylabel('MSE Loss')
+    # Plot Train Loss vs. epoch
+    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker='d', markersize=6, label=f'Naive d\'={dstop}')
+    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
+    axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
+    axs[0].set_ylabel('Train loss')
     axs[0].set_yscale('log')
     # axs[0].grid(True, linewidth=0.25)
     axs[0].legend()
 
-    # Lower: Test loss vs. epoch
-    axs[1].plot(range(0, epochs + 1), diffs, color='tab:red', marker='s', markersize=6)
+    # Plot Test Loss vs. epoch
+    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue',  marker='d', markersize=6, label=f'Naive d\'={dstop}')
+    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
+    axs[1].plot(epoch_range, test_loss_cp, color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
+    axs[1].set_ylabel('Test loss')
     axs[1].set_xlabel('Epoch')
-    axs[1].set_ylabel(r'$\max_x |NN_{orig}(x) - NN_{comp}(x)|$')
+    axs[1].set_yscale('log')
     # axs[1].grid(True, linewidth=0.25)
 
     plt.tight_layout()
-    # plt.savefig('training_relu_adam.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
+
+    filename = f'LTH_relu_adam_d{d}_dstop{dstop}_k{k}_bs{batch_size}_lr{lr}_ep{epochs}.pdf'
+    plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()

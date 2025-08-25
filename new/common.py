@@ -14,11 +14,11 @@ class Sin(nn.Module):
         return torch.sin(2*torch.pi*20*x)
 
 class TwoLayerNet(nn.Module):
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, input_dim, hidden_dim, output_dim=1):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.act = Sin()
-        self.fc2 = nn.Linear(hidden_dim, 1)
+        self.act = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
     def forward(self, x):
         return self.fc2(self.act(self.fc1(x)))
 
@@ -43,11 +43,11 @@ class TwoLayerNet(nn.Module):
         return new_net
     
 class WeightedTwoLayerNet(nn.Module):
-    def __init__(self, input_dim, hidden_dim, weights=None):
+    def __init__(self, input_dim, hidden_dim, output_dim=1, weights=None):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, 1)
+        self.act = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
         # weights is a non-trainable multiplicative mask/scaling per hidden unit
         if weights is None:
             w = torch.ones(hidden_dim, dtype=torch.float32)
@@ -58,7 +58,7 @@ class WeightedTwoLayerNet(nn.Module):
         self.register_buffer('weights', w.view(-1))
 
     def forward(self, x):
-        h = self.relu(self.fc1(x))                 # (batch, d)
+        h = self.act(self.fc1(x))                 # (batch, d)
         h = h * self.weights.view(1, -1)           # elementwise scale by c_j
         return self.fc2(h)
 
@@ -85,41 +85,51 @@ class WeightedTwoLayerNet(nn.Module):
 # --- Extraction and compression utilities ---
 def extract(net: TwoLayerNet):
     """
-    Extracts parameters from a trained TwoLayerNet as arrays:
-    w_ with shape (d, 3) where d is hidden_dim, and scalar bias c.
-    Columns of w_: [a_i, w_i, b_i].
+    Extracts parameters from a TwoLayerNet as arrays:
+    w_ with shape (hidden, input+output+1) where d is hidden_dim, and scalar bias c.
     """
-    # fc1: weight shape (d,1), bias shape (d,)
-    # fc2: weight shape (1,d), bias scalar
     with torch.no_grad():
-        W1 = net.fc1.weight.data.cpu().numpy().reshape(-1)  # shape (d,)
-        b1 = net.fc1.bias.data.cpu().numpy()               # shape (d,)
-        W2 = net.fc2.weight.data.cpu().numpy().reshape(-1)  # shape (d,)
-        b2 = net.fc2.bias.data.item()
-    # Stack into (d, 3)
-    w_ = np.stack([W2, W1, b1], axis=1)
+        W1 = net.fc1.weight.data.cpu().numpy()              # shape (hidden, input)
+        b1 = net.fc1.bias.data.cpu().numpy().reshape(-1,1)  # shape (hidden, 1)
+        W2 = net.fc2.weight.data.cpu().numpy().transpose()  # shape (hidden, output)
+        b2 = net.fc2.bias.data.cpu().numpy()
+        # Assert dimensions agree
+        assert W1.shape[0] == W2.shape[0] == b1.shape[0], "Dimension mismatch in W1, W2, b1"
+        # Stack into big matrix: columns [W2, W1, b1]
+        w_ = np.concatenate([W2, W1, b1], axis=1)
     return w_, b2
 
 
-def compress_nn(net, k=1, dstop=100, tol=1e-12):
+def compress_nn(net: TwoLayerNet, k=1, dstop=100, tol=1e-12, print_progress=True):
     """
     Use the Compressor to compute per-unit weights c_j, then build a
     WeightedTwoLayerNet that keeps the original width but applies the
     multiplicative weights. Also return the alive indices (c_j > tol).
     """
     device = net.fc1.weight.device
-    # Extract [W2_j, W1_j, b1_j] from net (shape (d,3))
     w_orig, b2 = extract(net)
     cp = Compressor(w_orig, tol=tol)
-    weights, w_cp = cp.compress(k, dstop=dstop)
+    weights, w_cp = cp.compress(k, dstop=dstop, print_progress=print_progress)
 
-    net_cp = WeightedTwoLayerNet(input_dim=1, hidden_dim=dstop, weights=weights).to(device)
+    # Infer original dims
+    input_dim = net.fc1.in_features
+    output_dim = net.fc2.out_features
+
+    # Build compressed network with correct input dim
+    net_cp = WeightedTwoLayerNet(input_dim=input_dim, hidden_dim=dstop, weights=weights).to(device)
+
+    # w_cp columns are [W2 (dstop, output_dim), W1 (dstop, input_dim), b1 (dstop, 1)]
+    W2_cp = w_cp[:, :output_dim]                            # (dstop, out)
+    W1_cp = w_cp[:, output_dim:output_dim + input_dim]      # (dstop, in)
+    b1_cp = w_cp[:, output_dim + input_dim]                 # (dstop,)
 
     with torch.no_grad():
-        net_cp.fc1.weight.copy_(torch.from_numpy(w_cp[:, 1].astype(np.float32).reshape(-1, 1)).to(device))  # W1
-        net_cp.fc1.bias.copy_(torch.from_numpy(w_cp[:, 2].astype(np.float32)).to(device))                  # b1
-        net_cp.fc2.weight.copy_(torch.from_numpy(w_cp[:, 0].astype(np.float32).reshape(1, -1)).to(device)) # W2
-        net_cp.fc2.bias.copy_(torch.tensor([b2], dtype=torch.float32, device=device))                      # b2
+        # fc1: (hidden, in)
+        net_cp.fc1.weight.copy_(torch.from_numpy(W1_cp.astype(np.float32)).to(device))
+        net_cp.fc1.bias.copy_(torch.from_numpy(b1_cp.astype(np.float32)).to(device))
+        # fc2: weight (out, hidden) is the transpose of stored (hidden, out)
+        net_cp.fc2.weight.copy_(torch.from_numpy(W2_cp.astype(np.float32).T).to(device))
+        net_cp.fc2.bias.copy_(torch.from_numpy(b2.astype(np.float32)).to(device))
 
     weights_t = torch.as_tensor(weights, dtype=torch.float32, device=device)
     return net_cp, weights_t
@@ -161,6 +171,8 @@ def make_canvas(
     bottom_pt: float = 35.0,
     top_pt: float = 20.0,
     fontsize: float = 8.0,
+    rows: int = 1,
+    cols: int = 1,
 ):
     _PT_PER_IN = 72.0
     # Use PDF “base 14” fonts (Helvetica) — no TTF embedding, no fontTools warnings
@@ -187,12 +199,5 @@ def make_canvas(
     fig_w_pt = left_pt + axes_width_pt + right_pt
     fig_h_pt = bottom_pt + axes_h_pt + top_pt
 
-    fig = plt.figure(figsize=(fig_w_pt/_PT_PER_IN, fig_h_pt/_PT_PER_IN))
-    ax = fig.add_axes([
-        left_pt/fig_w_pt,
-        bottom_pt/fig_h_pt,
-        axes_width_pt/fig_w_pt,
-        axes_h_pt/fig_h_pt,
-    ])
     # ax.grid(True, which="both", linestyle=":", linewidth=0.5)
-    return fig, ax
+    return plt.subplots(rows, cols, figsize=(fig_w_pt/_PT_PER_IN, fig_h_pt/_PT_PER_IN), sharex=True)

@@ -1,8 +1,9 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
+import matplotlib.pyplot as plt
+plt.rc('font', family='Helvetica', size=8)
 
 from common import TwoLayerNet, fix_random_seed, make_canvas
 from data_gen import generate_train_data
