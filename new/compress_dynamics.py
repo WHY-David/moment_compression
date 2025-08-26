@@ -169,26 +169,27 @@ if __name__ == '__main__':
     fix_random_seed(seed)
 
     # Hyperparameters
-    d = 10000
-    dstop = 1000
+    d = 2000
+    dstop = 200
     k = 3
-    train_size = 100_000
+    train_size = 20_000
     test_size = train_size
     tol = 1e-12
     lr = 0.0001
-    epochs = 50
+    epochs = 100
     batch_size = 1024
+    activation = nn.ReLU
     algo = torch.optim.Adam
 
     # TensorDataset
-    net_truth = TwoLayerNet(input_dim=2, hidden_dim=d).to(device)
-    train_data = generate_train_data(train_size, net=net_truth, noise=0.5, seed=seed**2, return_tensor=True, device=device)
+    net_truth = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=.5).to(device)
+    train_data = generate_train_data(train_size, net=net_truth, noise=0., seed=seed**2, return_tensor=True, device=device)
     train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
-    test_data = generate_train_data(test_size, net=net_truth, noise=0.0, seed=seed**3, return_tensor=True, device=device)
+    test_data = generate_train_data(test_size, net=net_truth, noise=0., seed=seed**3, return_tensor=True, device=device)
     test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
     # 1) Original network
-    net_orig = TwoLayerNet(input_dim=2, hidden_dim=d).to(device)
+    net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=.5).to(device)
     net_cp, weights_t = compress_nn(net_orig, dstop=dstop, k=k, tol=tol)
     print(f'Compression completed. d={d} -> dstop={dstop}')
     net_naive = naive_prune(net_orig, dstop)

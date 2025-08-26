@@ -14,40 +14,52 @@ class Sin(nn.Module):
         return torch.sin(2*torch.pi*20*x)
 
 class TwoLayerNet(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim=1):
+    def __init__(self, input_dim, hidden_dim, output_dim=1, init_uniform=None, bias_uniform=None, activation=nn.ReLU):
+        """
+        init_uniform: None (use PyTorch defaults) or
+                      float r  -> initialize weights/biases ~ U(-r, r)
+                      (a, b)   -> initialize weights/biases ~ U(a, b)
+        bias_uniform: None -> use `init_uniform` for biases; otherwise same semantics as above.
+        """
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.act = nn.ReLU()
+        self.act = activation()
         self.fc2 = nn.Linear(hidden_dim, output_dim)
+
+        # Optional custom initialization
+        if (init_uniform is not None) or (bias_uniform is not None):
+            self._custom_init(init_uniform, bias_uniform)
+
+    def _custom_init(self, w_range=None, b_range=None):
+        def _parse(r):
+            if r is None:
+                return None
+            if isinstance(r, (tuple, list)) and len(r) == 2:
+                a, b = float(r[0]), float(r[1])
+            else:
+                a, b = -float(r), float(r)
+            return a, b
+
+        w_ab = _parse(w_range)
+        b_ab = _parse(b_range) if b_range is not None else w_ab
+        with torch.no_grad():
+            if w_ab is not None:
+                nn.init.uniform_(self.fc1.weight, *w_ab)
+                nn.init.uniform_(self.fc2.weight, *w_ab)
+            if b_ab is not None:
+                nn.init.uniform_(self.fc1.bias, *b_ab)
+                nn.init.uniform_(self.fc2.bias, *b_ab)
+
     def forward(self, x):
         return self.fc2(self.act(self.fc1(x)))
 
-    def clone(self):
-        """Return a deep copy of this TwoLayerNet without consuming RNG."""
-        # Dimensions
-        input_dim = self.fc1.weight.shape[1]
-        hidden_dim = self.fc1.weight.shape[0]
-        # Temporarily disable random init for Linear
-        orig_reset = nn.Linear.reset_parameters
-        nn.Linear.reset_parameters = lambda self, *args, **kwargs: None
-        # Instantiate on same device
-        new_net = TwoLayerNet(input_dim, hidden_dim).to(self.fc1.weight.device)
-        # Restore init method
-        nn.Linear.reset_parameters = orig_reset
-        # Copy parameters exactly
-        with torch.no_grad():
-            new_net.fc1.weight.copy_(self.fc1.weight)
-            new_net.fc1.bias.copy_(self.fc1.bias)
-            new_net.fc2.weight.copy_(self.fc2.weight)
-            new_net.fc2.bias.copy_(self.fc2.bias)
-        return new_net
-    
 class WeightedTwoLayerNet(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim=1, weights=None):
+    def __init__(self, input_dim, hidden_dim, output_dim=1, weights=None, init_uniform=None, bias_uniform=None, activation=nn.ReLU):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.act = nn.ReLU()
+        self.act = activation()
         self.fc2 = nn.Linear(hidden_dim, output_dim)
+
         # weights is a non-trainable multiplicative mask/scaling per hidden unit
         if weights is None:
             w = torch.ones(hidden_dim, dtype=torch.float32)
@@ -57,9 +69,33 @@ class WeightedTwoLayerNet(nn.Module):
                 raise ValueError(f"weights length {w.numel()} != hidden_dim {hidden_dim}")
         self.register_buffer('weights', w.view(-1))
 
+        # Optional custom initialization
+        if (init_uniform is not None) or (bias_uniform is not None):
+            self._custom_init(init_uniform, bias_uniform)
+
+    def _custom_init(self, w_range=None, b_range=None):
+        def _parse(r):
+            if r is None:
+                return None
+            if isinstance(r, (tuple, list)) and len(r) == 2:
+                a, b = float(r[0]), float(r[1])
+            else:
+                a, b = -float(r), float(r)
+            return a, b
+
+        w_ab = _parse(w_range)
+        b_ab = _parse(b_range) if b_range is not None else w_ab
+        with torch.no_grad():
+            if w_ab is not None:
+                nn.init.uniform_(self.fc1.weight, *w_ab)
+                nn.init.uniform_(self.fc2.weight, *w_ab)
+            if b_ab is not None:
+                nn.init.uniform_(self.fc1.bias, *b_ab)
+                nn.init.uniform_(self.fc2.bias, *b_ab)
+
     def forward(self, x):
         h = self.act(self.fc1(x))                 # (batch, d)
-        h = h * self.weights.view(1, -1)           # elementwise scale by c_j
+        h = h * self.weights.view(1, -1)          # elementwise scale by c_j
         return self.fc2(h)
 
     def clone(self):
