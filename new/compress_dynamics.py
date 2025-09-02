@@ -5,7 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 
-from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas
+from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas, Sin
 from data_gen import generate_train_data
 
 import sys
@@ -169,27 +169,27 @@ if __name__ == '__main__':
     fix_random_seed(seed)
 
     # Hyperparameters
-    d = 2000
-    dstop = 200
+    d = 4000
+    dstop = 400
     k = 3
-    train_size = 20_000
+    train_size = 100_000
     test_size = train_size
+    train_noise = 0.3
     tol = 1e-12
-    lr = 0.0001
+    lr = 1e-5
     epochs = 100
     batch_size = 1024
-    activation = nn.ReLU
     algo = torch.optim.Adam
 
     # TensorDataset
-    net_truth = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=.5).to(device)
-    train_data = generate_train_data(train_size, net=net_truth, noise=0., seed=seed**2, return_tensor=True, device=device)
+    net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
+    train_data = generate_train_data(train_size, net=net_truth, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
     train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
     test_data = generate_train_data(test_size, net=net_truth, noise=0., seed=seed**3, return_tensor=True, device=device)
     test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
     # 1) Original network
-    net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=.5).to(device)
+    net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
     net_cp, weights_t = compress_nn(net_orig, dstop=dstop, k=k, tol=tol)
     print(f'Compression completed. d={d} -> dstop={dstop}')
     net_naive = naive_prune(net_orig, dstop)
@@ -200,22 +200,22 @@ if __name__ == '__main__':
     train_loss_naive, test_loss_naive = train_orig(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
 
     # 5) Plot: three subplots
-    fig, axs = make_canvas(rows=2, cols=1)
+    fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
     epoch_range = list(range(epochs+1))
 
     # Plot Train Loss vs. epoch
-    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker='d', markersize=6, label=f'Naive d\'={dstop}')
-    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
-    axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
+    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker='d', markersize=2, label=f'Naive d\'={dstop}')
+    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker='o', markersize=2, label=f'Original d={d}')
+    axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker='^', markersize=2, label=f'Compressed d\'={dstop}')
     axs[0].set_ylabel('Train loss')
     axs[0].set_yscale('log')
     # axs[0].grid(True, linewidth=0.25)
     axs[0].legend()
 
     # Plot Test Loss vs. epoch
-    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue',  marker='d', markersize=6, label=f'Naive d\'={dstop}')
-    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker='o', markersize=6, label=f'Original d={d}')
-    axs[1].plot(epoch_range, test_loss_cp, color='tab:orange',marker='^', markersize=6, label=f'Compressed d\'={dstop}')
+    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue',  marker='d', markersize=2, label=f'Naive d\'={dstop}')
+    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker='o', markersize=2, label=f'Original d={d}')
+    axs[1].plot(epoch_range, test_loss_cp, color='tab:orange',marker='^', markersize=2, label=f'Compressed d\'={dstop}')
     axs[1].set_ylabel('Test loss')
     axs[1].set_xlabel('Epoch')
     axs[1].set_yscale('log')
@@ -223,6 +223,6 @@ if __name__ == '__main__':
 
     plt.tight_layout()
 
-    filename = f'LTH_relu_adam_d{d}_dstop{dstop}_k{k}_bs{batch_size}_lr{lr}_ep{epochs}.pdf'
+    filename = f'LTH_sin_adam_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}.pdf'
     plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()
