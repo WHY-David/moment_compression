@@ -19,7 +19,7 @@ def _infer_device(x: ArrayLike, y: ArrayLike) -> torch.device:
         return y.device
     return torch.device("cpu")
 
-def f(
+def fnet(
     x: ArrayLike,
     y: ArrayLike,
     seed: int = 0,
@@ -56,6 +56,7 @@ def f(
 def generate_train_data(
     size: int,
     net=None,
+    f=None,
     noise: float = 0.0,
     seed: int = 0,
     return_tensor: bool = False,
@@ -72,14 +73,18 @@ def generate_train_data(
     if device is None:
         device = torch.device("cpu")
 
-    # sample x, y ~ U[0,1)
-    x = torch.rand(size, device=device, dtype=torch.float32)
-    y = torch.rand(size, device=device, dtype=torch.float32)
+    # sample x, y ~ U[-1,1)
+    x = torch.rand(size, device=device, dtype=torch.float32)*2-1.
+    y = torch.rand(size, device=device, dtype=torch.float32)*2-1.
 
     # model output
-    if net is None:
-        net = TwoLayerNet(2, 200).to(device)
-    fv = f(x, y, net=net, device=device, return_numpy=False)  # (size,)
+    if net is not None:
+        fv = fnet(x, y, net=net, device=device, return_numpy=False)  # (size,)
+    elif f is not None:
+        fv = f(x,y)
+    else:
+        raise ValueError("Either net or f must be provided")
+        
 
     # add Gaussian noise
     if noise and noise > 0:

@@ -5,6 +5,8 @@ from torch.utils.data import TensorDataset, DataLoader
 from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 
+from scipy.special import jv
+
 from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas, Sin
 from data_gen import generate_train_data
 
@@ -17,6 +19,28 @@ from compressor import Compressor
 # device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 device = torch.device('cpu')
 
+
+def cyl_harmonic(x, y):
+    # Convert torch tensors to numpy arrays if needed
+    if torch.is_tensor(x):
+        x_np = x.cpu().numpy()
+    else:
+        x_np = np.array(x)
+    if torch.is_tensor(y):
+        y_np = y.cpu().numpy()
+    else:
+        y_np = np.array(y)
+
+    r = np.sqrt(x_np**2 + y_np**2)
+    theta = np.arctan2(y_np, x_np)
+    result = jv(6, 20 * r) * np.sin(6 * theta)
+
+    # Convert result back to torch tensor, preserving dtype and device if possible
+    if torch.is_tensor(x):
+        result = torch.from_numpy(result).to(x.device).type_as(x)
+    else:
+        result = torch.from_numpy(result)
+    return result
 
 def make_loader(dataset, batch_size=64, seed=0):
     """Deterministic DataLoader using a fixed shuffled index order."""
@@ -169,23 +193,27 @@ if __name__ == '__main__':
     fix_random_seed(seed)
 
     # Hyperparameters
-    d = 4000
-    dstop = 400
-    k = 3
+    # d = 2000
+    # dstop = 500
+    # k = 4
+    d = 10000
+    dstop = 1000
+    k = 6
     train_size = 100_000
     test_size = train_size
-    train_noise = 0.3
+    train_noise = 0.2
     tol = 1e-12
-    lr = 1e-5
-    epochs = 100
+    # lr = 1e-3
+    lr = 1e-4
+    epochs = 300
     batch_size = 1024
     algo = torch.optim.Adam
 
     # TensorDataset
-    net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
-    train_data = generate_train_data(train_size, net=net_truth, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
+    # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
+    train_data = generate_train_data(train_size, f=cyl_harmonic, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
     train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
-    test_data = generate_train_data(test_size, net=net_truth, noise=0., seed=seed**3, return_tensor=True, device=device)
+    test_data = generate_train_data(test_size, f=cyl_harmonic, noise=0., seed=seed**3, return_tensor=True, device=device)
     test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
     # 1) Original network
