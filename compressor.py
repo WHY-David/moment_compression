@@ -90,7 +90,7 @@ class Compressor:
             self.c_ = np.full(self.d, 1.0)
         else:
             self.c_ = np.asarray(weights, dtype=float)
-            assert len(self.c_) == self.d   
+            assert len(self.c_) == self.d
         self.alive = np.nonzero(self.c_ > self.tol)[0]
 
     def _build_index(self):
@@ -256,7 +256,7 @@ class Compressor:
 
                 if print_progress:
                     print(f"KMeans round: #alive={self.alive.size}/{self.d}, #removed={prev_alive_size-self.alive.size}, #clusters={n_clusters}, diam={diam:.2e}")
-                if self.alive.size < dstop+greedy_threshold or n_clusters < 50:
+                if self.alive.size < dstop+greedy_threshold or n_clusters < 30:
                     method = 'greedy'
                     self._build_index()
             elif method == 'greedy':

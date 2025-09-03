@@ -81,15 +81,15 @@ def train_orig(net: TwoLayerNet,
                test_ds: TensorDataset,
                epochs=5,
                batch_size=64,
-               lr=0.01,
                seed=0,
-               algo=torch.optim.SGD):
+               algo=torch.optim.SGD, 
+               **opt_params):
     """Train the baseline network. Returns (train_losses, test_losses) with snapshots per epoch (incl. epoch 0)."""
     fix_random_seed(seed)
     train_loader = make_loader(train_ds, batch_size=batch_size, seed=seed)
     test_loader = make_loader(test_ds, batch_size=batch_size, seed=seed)
     loss_fn = nn.MSELoss()
-    opt = algo(net.parameters(), lr=lr)
+    opt = algo(net.parameters(), **opt_params)
 
     # Initial evaluation (does not change mode due to compute_loss restoration)
     train_losses = [compute_loss(net, train_loader, loss_fn)]
@@ -119,14 +119,13 @@ def train_weighted(net: WeightedTwoLayerNet,
                test_ds: TensorDataset,
                epochs=5,
                batch_size=64,
-               lr=0.01,
                seed=0,
-               algo=torch.optim.SGD):
+               algo=torch.optim.SGD, **opt_params):
     fix_random_seed(seed)
     train_loader = make_loader(train_ds, batch_size=batch_size, seed=seed)
     test_loader = make_loader(test_ds, batch_size=batch_size, seed=seed)
     loss_fn = nn.MSELoss()
-    opt = algo(net.parameters(), lr=lr)
+    opt = algo(net.parameters(), **opt_params)
 
     weights_t = net.weights
     inv_c = torch.where(weights_t > tol,
@@ -193,21 +192,25 @@ if __name__ == '__main__':
     fix_random_seed(seed)
 
     # Hyperparameters
-    # d = 2000
-    # dstop = 500
-    # k = 4
     d = 10000
     dstop = 1000
-    k = 6
+    k = 5
     train_size = 100_000
     test_size = train_size
     train_noise = 0.2
     tol = 1e-12
-    # lr = 1e-3
-    lr = 1e-4
-    epochs = 300
+    epochs = 30
     batch_size = 1024
-    algo = torch.optim.Adam
+
+    # # Adam
+    # algo_name = 'Adam'
+    # lr = 1e-4
+    # algo = torch.optim.Adam
+
+    # SGD
+    algo_name = 'SGD'
+    lr = 1e-4
+    algo = torch.optim.SGD
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
@@ -223,27 +226,27 @@ if __name__ == '__main__':
     net_naive = naive_prune(net_orig, dstop)
 
     # 3) Train all cases with identical minibatches/order
-    train_loss_orig, test_loss_orig = train_orig(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
+    train_loss_orig, test_loss_orig = train_orig(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
     train_loss_cp, test_loss_cp = train_weighted(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
-    train_loss_naive, test_loss_naive = train_orig(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
+    train_loss_naive, test_loss_naive = train_orig(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
 
     # 5) Plot: three subplots
     fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
     epoch_range = list(range(epochs+1))
 
     # Plot Train Loss vs. epoch
-    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker='d', markersize=2, label=f'Naive d\'={dstop}')
-    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker='o', markersize=2, label=f'Original d={d}')
-    axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker='^', markersize=2, label=f'Compressed d\'={dstop}')
+    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker=None, markersize=2, label=f'Naive d\'={dstop}')
+    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker=None, markersize=2, label=f'Original d={d}')
+    axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker=None, markersize=2, label=f'Compressed d\'={dstop}')
     axs[0].set_ylabel('Train loss')
     axs[0].set_yscale('log')
     # axs[0].grid(True, linewidth=0.25)
     axs[0].legend()
 
     # Plot Test Loss vs. epoch
-    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue',  marker='d', markersize=2, label=f'Naive d\'={dstop}')
-    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker='o', markersize=2, label=f'Original d={d}')
-    axs[1].plot(epoch_range, test_loss_cp, color='tab:orange',marker='^', markersize=2, label=f'Compressed d\'={dstop}')
+    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue', marker=None, markersize=2, label=f'Naive d\'={dstop}')
+    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker=None, markersize=2, label=f'Original d={d}')
+    axs[1].plot(epoch_range, test_loss_cp, color='tab:orange', marker=None, markersize=2, label=f'Compressed d\'={dstop}')
     axs[1].set_ylabel('Test loss')
     axs[1].set_xlabel('Epoch')
     axs[1].set_yscale('log')
@@ -251,6 +254,6 @@ if __name__ == '__main__':
 
     plt.tight_layout()
 
-    filename = f'LTH_sin_adam_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}.pdf'
+    filename = f'LTH_harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}.pdf'
     plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()
