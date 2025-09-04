@@ -33,7 +33,8 @@ def cyl_harmonic(x, y):
 
     r = np.sqrt(x_np**2 + y_np**2)
     theta = np.arctan2(y_np, x_np)
-    result = jv(6, 20 * r) * np.sin(6 * theta)
+    # result = jv(6, 20 * r) * np.cos(6 * theta)
+    result = jv(1, 6 * r) * np.cos(1 * theta)
 
     # Convert result back to torch tensor, preserving dtype and device if possible
     if torch.is_tensor(x):
@@ -202,20 +203,30 @@ if __name__ == '__main__':
     epochs = 300
     batch_size = 1024
 
-    # # Adam
-    # algo_name = 'Adam'
-    # lr = 1e-4
-    # algo = torch.optim.Adam
+    # Adam
+    algo_name = 'Adam'
+    lr = 1e-4
+    algo = torch.optim.Adam
 
     # # SGD
     # algo_name = 'SGD'
     # lr = 1e-4
     # algo = torch.optim.SGD
 
-    # RMSprop
-    algo_name = 'RMSprop'
-    lr = 1e-4
-    algo = torch.optim.RMSprop
+    # # RMSprop
+    # algo_name = 'RMSprop'
+    # lr = 1e-4
+    # algo = torch.optim.RMSprop
+
+    # # Adagrad
+    # algo_name = 'Adagrad'
+    # lr = 1e-3
+    # algo = torch.optim.Adagrad
+
+    # # ASGD
+    # algo_name = 'ASGD'
+    # lr = 1e-4
+    # algo = torch.optim.ASGD
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
@@ -259,6 +270,6 @@ if __name__ == '__main__':
 
     plt.tight_layout()
 
-    filename = f'LTH_harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}.pdf'
-    plt.savefig(filename, format='pdf', bbox_inches='tight', pad_inches=0)
+    filename = f'LTH_lofreqharm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
+    plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()
