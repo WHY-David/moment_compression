@@ -7,7 +7,7 @@ plt.rc('font', family='Helvetica', size=8)
 
 from scipy.special import jv
 
-from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas, Sin
+from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas
 from data_gen import generate_train_data
 
 import sys
@@ -199,7 +199,7 @@ if __name__ == '__main__':
     test_size = train_size
     train_noise = 0.2
     tol = 1e-12
-    epochs = 30
+    epochs = 300
     batch_size = 1024
 
     # # Adam
@@ -207,10 +207,15 @@ if __name__ == '__main__':
     # lr = 1e-4
     # algo = torch.optim.Adam
 
-    # SGD
-    algo_name = 'SGD'
+    # # SGD
+    # algo_name = 'SGD'
+    # lr = 1e-4
+    # algo = torch.optim.SGD
+
+    # RMSprop
+    algo_name = 'RMSprop'
     lr = 1e-4
-    algo = torch.optim.SGD
+    algo = torch.optim.RMSprop
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
@@ -227,7 +232,7 @@ if __name__ == '__main__':
 
     # 3) Train all cases with identical minibatches/order
     train_loss_orig, test_loss_orig = train_orig(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-    train_loss_cp, test_loss_cp = train_weighted(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, lr=lr, seed=seed, algo=algo)
+    train_loss_cp, test_loss_cp = train_weighted(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
     train_loss_naive, test_loss_naive = train_orig(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
 
     # 5) Plot: three subplots
