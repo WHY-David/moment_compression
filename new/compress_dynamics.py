@@ -4,10 +4,11 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
+import csv
 
 from scipy.special import jv
 
-from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas
+from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas, cyl_harmonic
 from data_gen import generate_train_data
 
 import sys
@@ -19,29 +20,6 @@ from compressor import Compressor
 # device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 device = torch.device('cpu')
 
-
-def cyl_harmonic(x, y):
-    # Convert torch tensors to numpy arrays if needed
-    if torch.is_tensor(x):
-        x_np = x.cpu().numpy()
-    else:
-        x_np = np.array(x)
-    if torch.is_tensor(y):
-        y_np = y.cpu().numpy()
-    else:
-        y_np = np.array(y)
-
-    r = np.sqrt(x_np**2 + y_np**2)
-    theta = np.arctan2(y_np, x_np)
-    # result = jv(6, 20 * r) * np.cos(6 * theta)
-    result = jv(1, 6 * r) * np.cos(1 * theta)
-
-    # Convert result back to torch tensor, preserving dtype and device if possible
-    if torch.is_tensor(x):
-        result = torch.from_numpy(result).to(x.device).type_as(x)
-    else:
-        result = torch.from_numpy(result)
-    return result
 
 def make_loader(dataset, batch_size=64, seed=0):
     """Deterministic DataLoader using a fixed shuffled index order."""
@@ -96,7 +74,7 @@ def train_orig(net: TwoLayerNet,
     train_losses = [compute_loss(net, train_loader, loss_fn)]
     test_losses = [compute_loss(net, test_loader, loss_fn)]
 
-    for epoch in range(epochs):
+    for epoch in range(1, epochs+1):
         # ensure we're in training mode (compute_loss may have put us in eval temporarily)
         net.train()
         for x, y in train_loader:
@@ -108,10 +86,12 @@ def train_orig(net: TwoLayerNet,
             opt.step()
 
         # End-of-epoch evaluation (compute_loss preserves/restores mode)
-        train_losses.append(compute_loss(net, train_loader, loss_fn))
-        test_losses.append(compute_loss(net, test_loader, loss_fn))
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch {epoch+1}/{epochs} completed")
+        trl = compute_loss(net, train_loader, loss_fn)
+        tel = compute_loss(net, test_loader, loss_fn)
+        train_losses.append(trl)
+        test_losses.append(tel)
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch}/{epochs}. Train loss: {trl:.3e}, test loss: {tel:.3e}")
     return train_losses, test_losses
 
 
@@ -142,7 +122,7 @@ def train_weighted(net: WeightedTwoLayerNet,
     train_losses = [compute_loss(net, train_loader, loss_fn)]
     test_losses = [compute_loss(net, test_loader, loss_fn)]
 
-    for epoch in range(epochs):
+    for epoch in range(1, epochs+1):
         # ensure we're in training mode (compute_loss may have put us in eval temporarily)
         net.train()
         for x, y in train_loader:
@@ -156,7 +136,7 @@ def train_weighted(net: WeightedTwoLayerNet,
         # End-of-epoch evaluation (compute_loss preserves/restores mode)
         train_losses.append(compute_loss(net, train_loader, loss_fn))
         test_losses.append(compute_loss(net, test_loader, loss_fn))
-        if (epoch + 1) % 10 == 0:
+        if epoch % 10 == 0:
             print(f"Epoch {epoch+1}/{epochs} completed")
     return train_losses, test_losses
 
@@ -201,7 +181,7 @@ if __name__ == '__main__':
     train_noise = 0.2
     tol = 1e-12
     epochs = 300
-    batch_size = 1024
+    batch_size = 512
 
     # Adam
     algo_name = 'Adam'
@@ -223,10 +203,8 @@ if __name__ == '__main__':
     # lr = 1e-3
     # algo = torch.optim.Adagrad
 
-    # # ASGD
-    # algo_name = 'ASGD'
-    # lr = 1e-4
-    # algo = torch.optim.ASGD
+    # add AdamW
+
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
@@ -251,18 +229,18 @@ if __name__ == '__main__':
     epoch_range = list(range(epochs+1))
 
     # Plot Train Loss vs. epoch
-    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker=None, markersize=2, label=f'Naive d\'={dstop}')
-    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker=None, markersize=2, label=f'Original d={d}')
+    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
     axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker=None, markersize=2, label=f'Compressed d\'={dstop}')
+    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker=None, markersize=2, label=f'Naive d\'={dstop}')
     axs[0].set_ylabel('Train loss')
     axs[0].set_yscale('log')
     # axs[0].grid(True, linewidth=0.25)
     axs[0].legend()
 
     # Plot Test Loss vs. epoch
-    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue', marker=None, markersize=2, label=f'Naive d\'={dstop}')
-    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker=None, markersize=2, label=f'Original d={d}')
+    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
     axs[1].plot(epoch_range, test_loss_cp, color='tab:orange', marker=None, markersize=2, label=f'Compressed d\'={dstop}')
+    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue', marker=None, markersize=2, label=f'Naive d\'={dstop}')
     axs[1].set_ylabel('Test loss')
     axs[1].set_xlabel('Epoch')
     axs[1].set_yscale('log')
@@ -270,6 +248,29 @@ if __name__ == '__main__':
 
     plt.tight_layout()
 
-    filename = f'LTH_lofreqharm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
+    filename = f'LTH/harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
+    with open(filename + '.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        # Write header
+        writer.writerow([
+            'epoch',
+            'train_loss_orig',
+            'test_loss_orig',
+            'train_loss_cp',
+            'test_loss_cp',
+            'train_loss_naive',
+            'test_loss_naive'
+        ])
+        # Write data rows
+        for i in range(len(epoch_range)):
+            writer.writerow([
+                epoch_range[i],
+                train_loss_orig[i],
+                test_loss_orig[i],
+                train_loss_cp[i],
+                test_loss_cp[i],
+                train_loss_naive[i],
+                test_loss_naive[i]
+            ])
     plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()

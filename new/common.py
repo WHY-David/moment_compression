@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset
 from matplotlib import pyplot as plt
+from scipy.special import jv
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -198,6 +199,29 @@ def load_data(filename):
     x = torch.from_numpy(data[:, [0]]).float().to(device)
     y = torch.from_numpy(data[:, [1]]).float().to(device)
     return TensorDataset(x, y)
+
+def cyl_harmonic(x, y):
+    # Convert torch tensors to numpy arrays if needed
+    if torch.is_tensor(x):
+        x_np = x.cpu().numpy()
+    else:
+        x_np = np.array(x)
+    if torch.is_tensor(y):
+        y_np = y.cpu().numpy()
+    else:
+        y_np = np.array(y)
+
+    r = np.sqrt(x_np**2 + y_np**2)
+    theta = np.arctan2(y_np, x_np)
+    # result = jv(6, 20 * r) * np.cos(6 * theta)
+    result = jv(10, 50 * r) * np.cos(10 * theta)
+
+    # Convert result back to torch tensor, preserving dtype and device if possible
+    if torch.is_tensor(x):
+        result = torch.from_numpy(result).to(x.device).type_as(x)
+    else:
+        result = torch.from_numpy(result)
+    return result
 
 def make_canvas(
     axes_width_pt: float = 300.0,
