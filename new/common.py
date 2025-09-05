@@ -200,7 +200,7 @@ def load_data(filename):
     y = torch.from_numpy(data[:, [1]]).float().to(device)
     return TensorDataset(x, y)
 
-def cyl_harmonic(x, y):
+def cyl_harmonic(x, y, n:int=6, k:int=20):
     # Convert torch tensors to numpy arrays if needed
     if torch.is_tensor(x):
         x_np = x.cpu().numpy()
@@ -213,8 +213,7 @@ def cyl_harmonic(x, y):
 
     r = np.sqrt(x_np**2 + y_np**2)
     theta = np.arctan2(y_np, x_np)
-    # result = jv(6, 20 * r) * np.cos(6 * theta)
-    result = jv(10, 50 * r) * np.cos(10 * theta)
+    result = jv(n, k * r) * np.cos(n * theta)
 
     # Convert result back to torch tensor, preserving dtype and device if possible
     if torch.is_tensor(x):

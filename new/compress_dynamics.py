@@ -204,13 +204,16 @@ if __name__ == '__main__':
     # algo = torch.optim.Adagrad
 
     # add AdamW
-
+    algo_name = 'AdamW'
+    lr = 1e-4
+    algo = torch.optim.AdamW
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
-    train_data = generate_train_data(train_size, f=cyl_harmonic, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
+    f = lambda x,y: cyl_harmonic(x,y, n=6, k=20)
+    train_data = generate_train_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
     train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
-    test_data = generate_train_data(test_size, f=cyl_harmonic, noise=0., seed=seed**3, return_tensor=True, device=device)
+    test_data = generate_train_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
     test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
     # 1) Original network

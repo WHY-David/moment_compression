@@ -110,12 +110,14 @@ if __name__ == "__main__":
     lr = 5e-3
     algo = torch.optim.Adam
 
-    train_data = generate_train_data(d, f=cyl_harmonic, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
+    f = lambda x, y: cyl_harmonic(x, y, n=10, k=50)
+
+    train_data = generate_train_data(d, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
     cp = Compressor(train_data, random_state=seed)
     c_, train_cp = cp.compress(k, dstop=dstop, print_progress=True)
     print(f"Compression completed. d={d} -> d'={dstop}")
     train_naive = train_data[:dstop, :]
-    test_data = generate_train_data(d, f=cyl_harmonic, noise=0, seed=seed**3, return_tensor=True, device=device)
+    test_data = generate_train_data(d, f=f, noise=0, seed=seed**3, return_tensor=True, device=device)
 
     train_loader = make_loader(train_data, batch_size=batch_size)
     train_loader_cp = make_loader(train_cp, batch_size=batch_size)
