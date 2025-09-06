@@ -18,7 +18,7 @@ from compressor import Compressor
 
 # Device configuration
 # device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
-device = torch.device('cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def make_loader(dataset, batch_size=64, seed=0):
@@ -168,6 +168,9 @@ def naive_prune(net_orig:TwoLayerNet, hidden_dim:int):
 
 
 if __name__ == '__main__':
+    save_csv = True
+    save_pdf = True
+
     # Determinism
     seed = 42
     fix_random_seed(seed)
@@ -180,7 +183,7 @@ if __name__ == '__main__':
     test_size = train_size
     train_noise = 0.2
     tol = 1e-12
-    epochs = 300
+    epochs = 3000
     batch_size = 512
 
     # Adam
@@ -203,10 +206,10 @@ if __name__ == '__main__':
     # lr = 1e-3
     # algo = torch.optim.Adagrad
 
-    # add AdamW
-    algo_name = 'AdamW'
-    lr = 1e-4
-    algo = torch.optim.AdamW
+    # # add AdamW
+    # algo_name = 'AdamW'
+    # lr = 1e-4
+    # algo = torch.optim.AdamW
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
@@ -223,57 +226,58 @@ if __name__ == '__main__':
     net_naive = naive_prune(net_orig, dstop)
 
     # 3) Train all cases with identical minibatches/order
+    epoch_range = list(range(epochs+1))
     train_loss_orig, test_loss_orig = train_orig(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
     train_loss_cp, test_loss_cp = train_weighted(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
     train_loss_naive, test_loss_naive = train_orig(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
 
-    # 5) Plot: three subplots
-    fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
-    epoch_range = list(range(epochs+1))
-
-    # Plot Train Loss vs. epoch
-    axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
-    axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker=None, markersize=2, label=f'Compressed d\'={dstop}')
-    axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker=None, markersize=2, label=f'Naive d\'={dstop}')
-    axs[0].set_ylabel('Train loss')
-    axs[0].set_yscale('log')
-    # axs[0].grid(True, linewidth=0.25)
-    axs[0].legend()
-
-    # Plot Test Loss vs. epoch
-    axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
-    axs[1].plot(epoch_range, test_loss_cp, color='tab:orange', marker=None, markersize=2, label=f'Compressed d\'={dstop}')
-    axs[1].plot(epoch_range, test_loss_naive, color='tab:blue', marker=None, markersize=2, label=f'Naive d\'={dstop}')
-    axs[1].set_ylabel('Test loss')
-    axs[1].set_xlabel('Epoch')
-    axs[1].set_yscale('log')
-    # axs[1].grid(True, linewidth=0.25)
-
-    plt.tight_layout()
-
     filename = f'LTH/harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
-    with open(filename + '.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        # Write header
-        writer.writerow([
-            'epoch',
-            'train_loss_orig',
-            'test_loss_orig',
-            'train_loss_cp',
-            'test_loss_cp',
-            'train_loss_naive',
-            'test_loss_naive'
-        ])
-        # Write data rows
-        for i in range(len(epoch_range)):
+    if save_csv:
+        os.makedirs('LTH', exist_ok=True)
+        with open(filename + '.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # Write header
             writer.writerow([
-                epoch_range[i],
-                train_loss_orig[i],
-                test_loss_orig[i],
-                train_loss_cp[i],
-                test_loss_cp[i],
-                train_loss_naive[i],
-                test_loss_naive[i]
+                'epoch',
+                'train_loss_orig',
+                'test_loss_orig',
+                'train_loss_cp',
+                'test_loss_cp',
+                'train_loss_naive',
+                'test_loss_naive'
             ])
-    plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
-    plt.show()
+            # Write data rows
+            for i in range(len(epoch_range)):
+                writer.writerow([
+                    epoch_range[i],
+                    train_loss_orig[i],
+                    test_loss_orig[i],
+                    train_loss_cp[i],
+                    test_loss_cp[i],
+                    train_loss_naive[i],
+                    test_loss_naive[i]
+                ])
+    if save_pdf:
+        os.makedirs('LTH', exist_ok=True)
+        fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
+
+        # Plot Train Loss vs. epoch
+        axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
+        axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker=None, markersize=2, label=f'Compressed d\'={dstop}')
+        axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker=None, markersize=2, label=f'Naive d\'={dstop}')
+        axs[0].set_ylabel('Train loss')
+        axs[0].set_yscale('log')
+        # axs[0].grid(True, linewidth=0.25)
+        axs[0].legend()
+
+        # Plot Test Loss vs. epoch
+        axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
+        axs[1].plot(epoch_range, test_loss_cp, color='tab:orange', marker=None, markersize=2, label=f'Compressed d\'={dstop}')
+        axs[1].plot(epoch_range, test_loss_naive, color='tab:blue', marker=None, markersize=2, label=f'Naive d\'={dstop}')
+        axs[1].set_ylabel('Test loss')
+        axs[1].set_xlabel('Epoch')
+        axs[1].set_yscale('log')
+        # axs[1].grid(True, linewidth=0.25)
+
+        plt.tight_layout()
+        plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
