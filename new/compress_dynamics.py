@@ -186,10 +186,10 @@ if __name__ == '__main__':
     epochs = 3000
     batch_size = 512
 
-    # Adam
-    algo_name = 'Adam'
-    lr = 1e-4
-    algo = torch.optim.Adam
+    # # Adam
+    # algo_name = 'Adam'
+    # lr = 3e-5
+    # algo = torch.optim.Adam
 
     # # SGD
     # algo_name = 'SGD'
@@ -198,7 +198,7 @@ if __name__ == '__main__':
 
     # # RMSprop
     # algo_name = 'RMSprop'
-    # lr = 1e-4
+    # lr = 3e-5
     # algo = torch.optim.RMSprop
 
     # # Adagrad
@@ -206,10 +206,10 @@ if __name__ == '__main__':
     # lr = 1e-3
     # algo = torch.optim.Adagrad
 
-    # # add AdamW
-    # algo_name = 'AdamW'
-    # lr = 1e-4
-    # algo = torch.optim.AdamW
+    # Adamax
+    algo_name = 'Adamax'
+    lr = 5e-5
+    algo = torch.optim.Adamax
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)

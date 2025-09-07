@@ -101,7 +101,7 @@ if __name__ == "__main__":
     dstop = 100 # compressed training dataset size
     k = 5
     train_noise = 0.
-    test_size = 10_000
+    test_size = 100_000
     hidden_dim = 200
     epochs = 100
     batch_size = None
