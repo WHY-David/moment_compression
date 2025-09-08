@@ -24,7 +24,6 @@ def fnet(
     y: ArrayLike,
     seed: int = 0,
     net: Optional[torch.nn.Module] = None,
-    device: Optional[torch.device] = None,
     return_numpy: bool = False,
 ):
     """
@@ -37,10 +36,7 @@ def fnet(
         fix_random_seed(seed)
         net = TwoLayerNet(2, 200)
 
-    if device is None:
-        device = _infer_device(x, y)
-
-    net = net.to(device).eval()
+    net.eval()
 
     with torch.no_grad():
         if x.shape != y.shape:
@@ -53,7 +49,7 @@ def fnet(
     return out
 
 
-def generate_train_data(
+def generate_data(
     size: int,
     net=None,
     f=None,
@@ -79,7 +75,7 @@ def generate_train_data(
 
     # model output
     if net is not None:
-        fv = fnet(x, y, net=net, device=device, return_numpy=False)  # (size,)
+        fv = fnet(x, y, net=net, return_numpy=False)  # (size,)
     elif f is not None:
         fv = f(x,y)
     else:
@@ -103,7 +99,7 @@ def generate_train_data(
 if __name__ == "__main__":
     # Example usage
     size = 1_000_000
-    data = generate_train_data(size, func=f, noise=0.0, seed=42, return_tensor=False)
+    data = generate_data(size, func=f, noise=0.0, seed=42, return_tensor=False)
 
     # 3D scatter plot of (x, y, f(x,y))
     xs = data[:, 0]

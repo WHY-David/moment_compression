@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler, RandomSampler
 
 from common import TwoLayerNet, fix_random_seed, make_canvas
-from data_gen import generate_train_data
+from data_gen import generate_data
 
 import sys
 import os
@@ -94,12 +94,12 @@ if __name__ == "__main__":
     batch_size = d
     seed = 42
 
-    train_data = generate_train_data(d, noise=0.0, seed=seed**2, return_tensor=False, device=device)
+    train_data = generate_data(d, noise=0.0, seed=seed**2, return_tensor=False, device=device)
     cp = Compressor(train_data)
     c_, train_cp = cp.compress(3, dstop=dstop, print_progress=True)
     print(f"Compression completed. d={d} -> d'={dstop}")
     train_naive = train_data[:dstop, :]
-    test_data = generate_train_data(d, noise=0.0, seed=seed*10, return_tensor=False, device=device)
+    test_data = generate_data(d, noise=0.0, seed=seed*10, return_tensor=False, device=device)
 
     train_loader = make_loader(train_data, d, batch_size=batch_size)
     train_loader_cp = make_loader(train_cp, d, weights=c_, batch_size=batch_size)

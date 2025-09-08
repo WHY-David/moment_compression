@@ -58,9 +58,10 @@ def compute_loss(net, loader, weights=None):
                 loss = (w * sq_err).sum() / w.sum()
             return loss.item()
 
-def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=None, seed=0, algo=torch.optim.SGD, **opt_params):
+def bptrain(train_loader, test_loader, hidden_dim, epochs=5, train_weights=None, seed=0, algo=torch.optim.SGD, **opt_params):
     fix_random_seed(seed)
-    net = TwoLayerNet(2, hidden_dim).to(device)
+    # net = TwoLayerNet(2, hidden_dim).to(device)
+    net = nn.Linear(2, 1, bias=True, device=device)
     opt = algo(net.parameters(), **opt_params)
 
     # initial losses
@@ -97,21 +98,21 @@ if __name__ == "__main__":
     seed = 42
 
     d = 10_000  # train size
-    dstop = 1_000 # compressed training dataset size
+    dstop = 1000 # compressed training dataset size
     k = 5
-    train_noise = 3.0
+    train_noise = 1.0
     test_size = 100_000
-    hidden_dim = 50
-    epochs = 600
+    hidden_dim = 200
+    epochs = 2000
     batch_size = None
 
-    algo_name = 'AdamW'
+    algo_name = 'SGD'
     lr = 1e-2
-    algo = torch.optim.AdamW
+    algo = torch.optim.SGD
 
+    # f = lambda x, y: 3*x-2*y+0.5
     fix_random_seed(seed*10)
-    # f = lambda x, y: cyl_harmonic(x, y, n=10, k=50)
-    truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
+    truth_net = nn.Linear(2, 1, bias=True, device=device)
 
     train_data = generate_data(d, net=truth_net, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
     cp = Compressor(train_data, random_state=seed)
@@ -154,7 +155,7 @@ if __name__ == "__main__":
 
     plt.tight_layout()
 
-    filename = f'CPTDS/harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
+    filename = f'CPTDS/linear_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
     with open(filename + '.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         # Write header

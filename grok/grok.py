@@ -113,7 +113,8 @@ def bptrain(
     device: torch.device,
 ):
     model = TinyAddTransformer(P, d_model, n_heads, n_layers).to(device)
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
+    # opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
     # sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=MAX_EPOCHS, eta_min=LR*0.1)
 
     # Initial metrics at epoch 0
@@ -175,13 +176,15 @@ if __name__ == "__main__":
     N_TOTAL = P * P
     N_BIG = 4000
     N_SMALL = 2000
+    k = 4
+
     D_MODEL = 128
     N_HEADS = 4
     N_LAYERS = 1
-    LR = 1e-5
+    LR = 1e-3
     WD = 1.0
     BATCH_SIZE = min(512, N_SMALL // 2)
-    # BATCH_SIZE = 512
+    # BATCH_SIZE = N_BIG
     MAX_EPOCHS = 1000
     # DEVICE = torch.device(
     #     'cuda' if torch.cuda.is_available() else (
@@ -214,7 +217,7 @@ if __name__ == "__main__":
         sampler=torch.utils.data.RandomSampler(train_ds_small, replacement=True, num_samples=N_BIG),
     )
 
-    train_loader_cp = compress_loader(train_ds_big, dstop=N_SMALL, k=4, batch_size=BATCH_SIZE, seed=SEED)
+    train_loader_cp = compress_loader(train_ds_big, dstop=N_SMALL, k=k, batch_size=BATCH_SIZE, seed=SEED)
 
 
     fix_random_seed(SEED)

@@ -196,26 +196,11 @@ if __name__ == '__main__':
     print(f'Compression completed. d={d} -> dstop={dstop}')
     net_naive = naive_prune(net_orig, dstop)
 
-    # Train all cases with identical minibatches/order — run in parallel threads
+    # Train all cases with identical minibatches/order — sequential execution
     epoch_range = np.arange(0, epochs+1, 10)
-
-    results = {}
-
-    def _run_orig(key, net):
-        results[key] = bptrain(net, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-
-    import threading
-    t1 = threading.Thread(target=_run_orig, args=('orig', net_orig))
-    t2 = threading.Thread(target=_run_orig, args=('cp', net_cp))
-    t3 = threading.Thread(target=_run_orig, args=('naive', net_naive))
-    for t in (t1, t2, t3):
-        t.start()
-    for t in (t1, t2, t3):
-        t.join()
-
-    train_loss_orig, test_loss_orig = results['orig']
-    train_loss_cp, test_loss_cp = results['cp']
-    train_loss_naive, test_loss_naive = results['naive']
+    train_loss_orig, test_loss_orig = bptrain(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
+    train_loss_cp,   test_loss_cp   = bptrain(net_cp,   train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
+    train_loss_naive, test_loss_naive = bptrain(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
 
     filename = f'LTH/harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
     if save_csv:
