@@ -19,27 +19,26 @@ from compressor import Compressor
 device = torch.device("cpu")
 
 
-def make_loader(data, batch_size=None):
+def make_loader(data, num_samples=None, batch_size=None, weights=None):
     if isinstance(data, np.ndarray):
         data = torch.from_numpy(data)
     X = data[:, :2].float().to(device)
     y = data[:, [2]].float().to(device)
 
     ds = TensorDataset(X, y)
+    if num_samples is None:
+        num_samples = len(ds)
     if batch_size is None:
         batch_size = len(ds)  # full-batch
-    # Deterministic order for all cases; no sampler and no shuffling.
-    return DataLoader(ds, batch_size=batch_size, shuffle=False)
+    assert batch_size <= num_samples
 
-# def make_test_loader(data, batch_size=None):
-#     if isinstance(data, np.ndarray):
-#         data = torch.from_numpy(data)
-#     X = data[:, :2].float().to(device)
-#     y = data[:, [2]].float().to(device)
-#     ds = TensorDataset(X, y)
-#     if batch_size is None:
-#         batch_size = len(ds)
-#     return DataLoader(ds, batch_size=batch_size, shuffle=False)
+    # if weights is None:
+    #     sampler = torch.utils.data.RandomSampler(ds, replacement=True, num_samples=num_samples)
+    # else:
+    #     weights = torch.as_tensor(weights)
+    #     sampler = torch.utils.data.WeightedRandomSampler(weights, num_samples=num_samples, replacement=True)
+    return DataLoader(ds, batch_size=batch_size)
+
 
 def compute_loss(net, loader, weights=None):
     """Manual MSE. If weights is None: (1/N) * sum_i ||f(x_i)-y_i||^2.
@@ -75,6 +74,7 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=N
         for inputs, labels in train_loader:  # single full batch
             opt.zero_grad()
             outputs = net(inputs)
+            # manual loss with weights
             sq_err = (outputs - labels).pow(2).squeeze(-1)
             if train_weights is None:
                 loss = sq_err.mean()
@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     plt.tight_layout()
 
-    filename = f'CPTDS/harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
+    filename = f'CPTDS/teacher_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
     with open(filename + '.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         # Write header

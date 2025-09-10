@@ -18,6 +18,7 @@ from compressor import Compressor
 # device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 device = torch.device("cpu")
 
+
 def make_loader(data, num_samples=None, batch_size=None, weights=None):
     if isinstance(data, np.ndarray):
         data = torch.from_numpy(data)
@@ -64,10 +65,9 @@ def compute_loss(net, loader, weights=None):
                 loss = (w * sq_err).sum() / w.sum()
             return loss.item()
 
-def bptrain(train_loader, test_loader, hidden_dim, epochs=5, train_weights=None, seed=0, algo=torch.optim.SGD, **opt_params):
+def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=None, seed=0, algo=torch.optim.SGD, **opt_params):
     fix_random_seed(seed)
-    # net = TwoLayerNet(2, hidden_dim).to(device)
-    net = nn.Linear(2, 1, bias=True, device=device)
+    net = TwoLayerNet(2, hidden_dim).to(device)
     opt = algo(net.parameters(), **opt_params)
     loss_fn = nn.MSELoss()
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=0.)
@@ -84,16 +84,10 @@ def bptrain(train_loader, test_loader, hidden_dim, epochs=5, train_weights=None,
         for inputs, labels in train_loader:
             opt.zero_grad()
             outputs = net(inputs)
-            # sq_err = (outputs - labels).pow(2).squeeze(-1)
-            # if train_weights is None:
-            #     loss = sq_err.mean()
-            # else:
-            #     loss = (w * sq_err).sum() / w.sum()
-            # Use proper MSE loss (module call, not constructor with tensors)
             loss = loss_fn(outputs, labels)
             loss.backward()
             opt.step()
-            sched.step()
+        sched.step()
 
         # record losses after the update
         train_loss = compute_loss(net, train_loader, weights=None)
@@ -109,24 +103,24 @@ if __name__ == "__main__":
     seed = 42
 
     d = 10_000  # train size
-    dstop = 1000 # compressed training dataset size
+    dstop = 1_000 # compressed training dataset size
     k = 5
-    train_noise = 1.0
+    train_noise = 3.0
     test_size = 100_000
-    hidden_dim = 200
-    epochs = 2000
-    batch_size = 128
+    hidden_dim = 50
+    epochs = 400
+    batch_size = 256
 
     algo_name = 'AdamW'
     lr = 1e-3
     algo = torch.optim.AdamW
 
-    # f = lambda x, y: 3*x-2*y+0.5
     fix_random_seed(seed*10)
-    truth_net = nn.Linear(2, 1, bias=True, device=device)
+    # f = lambda x, y: cyl_harmonic(x, y, n=10, k=50)
+    truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
 
     train_data = generate_data(d, net=truth_net, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
-    cp = Compressor(train_data, random_state=seed)
+    cp = Compressor(train_data.to("cpu").numpy(), random_state=seed)
     c_, train_cp = cp.compress(k, dstop=dstop, print_progress=True)
     print(f"Compression completed. d={d} -> d'={dstop}")
     train_naive = train_data[:dstop, :]
@@ -135,7 +129,7 @@ if __name__ == "__main__":
     train_loader = make_loader(train_data, num_samples=d, batch_size=batch_size)
     train_loader_cp = make_loader(train_cp, num_samples=d, batch_size=batch_size, weights=c_)
     train_loader_naive = make_loader(train_naive, num_samples=d, batch_size=batch_size)
-    test_loader = make_test_loader(test_data, batch_size=batch_size)
+    test_loader = make_test_loader(test_data)
 
     # train three cases with identical hyperparameters
     train_loss_orig, test_loss_orig = bptrain(train_loader, test_loader, hidden_dim, epochs=epochs, seed=seed, algo=algo, lr=lr)
@@ -166,7 +160,7 @@ if __name__ == "__main__":
 
     plt.tight_layout()
 
-    filename = f'CPTDS/linear_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
+    filename = f'CPTDS/teacher_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
     with open(filename + '.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         # Write header

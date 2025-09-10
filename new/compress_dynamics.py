@@ -157,10 +157,10 @@ if __name__ == '__main__':
     # lr = 5e-5
     # algo = torch.optim.Adam
 
-    # # SGD
-    # algo_name = 'SGD'
-    # lr = 1e-3
-    # algo = torch.optim.SGD
+    # SGD
+    algo_name = 'SGD'
+    lr = 5e-4
+    algo = torch.optim.SGD
 
     # # RMSprop
     # algo_name = 'RMSprop'
@@ -177,10 +177,10 @@ if __name__ == '__main__':
     # lr = 5e-5
     # algo = torch.optim.Adamax
 
-    # AdamW
-    algo_name = 'AdamW'
-    lr = 5e-5
-    algo = torch.optim.AdamW
+    # # AdamW
+    # algo_name = 'AdamW'
+    # lr = 5e-5
+    # algo = torch.optim.AdamW
 
     # TensorDataset
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
