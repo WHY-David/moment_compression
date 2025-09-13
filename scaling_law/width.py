@@ -6,8 +6,6 @@ from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 import csv
 
-from scipy.special import jv
-
 from common import TwoLayerNet, WeightedTwoLayerNet, fix_random_seed, compress_nn, make_canvas, cyl_harmonic
 from data_gen import generate_data
 
@@ -106,30 +104,6 @@ def bptrain(net,
             test_losses.append(tel)
             print(f"Epoch {epoch}/{epochs}. Train loss: {trl:.3e}, test loss: {tel:.3e}")
     return train_losses, test_losses
-
-
-def naive_prune(net_orig:TwoLayerNet, hidden_dim:int):
-    input_dim = net_orig.fc1.weight.shape[1]
-
-    # Temporarily disable random init for Linear
-    orig_reset = nn.Linear.reset_parameters
-    nn.Linear.reset_parameters = lambda self, *args, **kwargs: None
-    # Instantiate on same device
-    net = TwoLayerNet(input_dim, hidden_dim).to(net_orig.fc1.weight.device)
-    # Restore init method
-    nn.Linear.reset_parameters = orig_reset
-
-    with torch.no_grad():
-        W1 = net_orig.fc1.weight[:hidden_dim, :].clone()
-        b1 = net_orig.fc1.bias[:hidden_dim].clone()
-        W2 = net_orig.fc2.weight[:, :hidden_dim].clone()
-        b2 = net_orig.fc2.bias.clone()
-
-        net.fc1.weight.copy_(W1)
-        net.fc1.bias.copy_(b1)
-        net.fc2.weight.copy_(W2)
-        net.fc2.bias.copy_(b2)
-    return net
     
 
 
@@ -142,19 +116,19 @@ if __name__ == '__main__':
     fix_random_seed(seed)
 
     # Hyperparameters
-    d = 10000
-    dstop = 1000
-    k = 5
-    train_size = 100_000
-    test_size = train_size
+    dlist = [2**n for n in range(8,18)]
+    dstop = lambda d: int(16*np.sqrt(d))
+    k = 6
+    train_size = 1_000_000
+    test_size = 100_000
     train_noise = 0.2
     tol = 1e-12
-    epochs = 3000
+    epochs = 30
     batch_size = 512
 
     # # Adam
     # algo_name = 'Adam'
-    # lr = 1e-4
+    # lr = 5e-5
     # algo = torch.optim.Adam
 
     # # SGD
@@ -162,94 +136,78 @@ if __name__ == '__main__':
     # lr = 5e-4
     # algo = torch.optim.SGD
 
-    # # RMSprop
-    # algo_name = 'RMSprop'
-    # lr = 5e-5
-    # algo = torch.optim.RMSprop
-
-    # # Rprop
-    # algo_name = 'Rprop'
-    # lr = 1e-2
-    # algo = torch.optim.Rprop
-
-    # # Adamax
-    # algo_name = 'Adamax'
-    # lr = 5e-5
-    # algo = torch.optim.Adamax
-
     # AdamW
     algo_name = 'AdamW'
-    lr = 1e-4
+    lr = 1e-3
     algo = torch.optim.AdamW
 
-    # TensorDataset
+    task_name = "harm"
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
     f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
     # f = lambda x, y: x*y/(x**2+y**2)
+
     train_data = generate_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
     train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
     test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
     test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
-    # Original network
-    net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
-    net_cp, weights_t = compress_nn(net_orig, dstop=dstop, k=k, tol=tol)
-    print(f'Compression completed. d={d} -> dstop={dstop}')
-    net_naive = naive_prune(net_orig, dstop)
+    train_losses = []
+    test_losses = []
+    train_losses_cp = []
+    test_losses_cp = []
 
-    # Train all cases with identical minibatches/order — sequential execution
+    for d in dlist:
+        net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
+        net_cp, weights_t = compress_nn(net_orig, dstop=dstop(d), k=k, tol=tol)
+        print(f'Compression completed. d={d} -> dstop={dstop(d)}')
+
+        # Train all cases with identical minibatches/order — sequential execution
+        train_loss, test_loss = bptrain(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
+        train_loss_cp, test_loss_cp = bptrain(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
+        train_losses.append(train_loss)
+        test_losses.append(test_loss)
+        train_losses_cp.append(train_loss_cp)
+        test_losses_cp.append(test_loss_cp)
+
     epoch_range = np.arange(0, epochs+1, 10)
-    train_loss_orig, test_loss_orig = bptrain(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-    train_loss_cp,   test_loss_cp   = bptrain(net_cp,   train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-    train_loss_naive, test_loss_naive = bptrain(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
 
-    filename = f'LTH/harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
-    if save_csv:
-        os.makedirs('LTH', exist_ok=True)
-        with open(filename + '.csv', 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            # Write header
-            writer.writerow([
-                'epoch',
-                'train_loss_orig',
-                'test_loss_orig',
-                'train_loss_cp',
-                'test_loss_cp',
-                'train_loss_naive',
-                'test_loss_naive'
-            ])
-            # Write data rows
-            for i in range(len(epoch_range)):
-                writer.writerow([
-                    epoch_range[i],
-                    train_loss_orig[i],
-                    test_loss_orig[i],
-                    train_loss_cp[i],
-                    test_loss_cp[i],
-                    train_loss_naive[i],
-                    test_loss_naive[i]
-                ])
+    os.makedirs('LTH', exist_ok=True)
+    filename = f'LTH/{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
+    # if save_csv:
+    #     with open(filename + '.csv', 'w', newline='') as csvfile:
+    #         writer = csv.writer(csvfile)
+    #         # Write header
+    #         writer.writerow([
+    #             'epoch',
+    #             'train_loss_orig',
+    #             'test_loss_orig',
+    #             'train_loss_cp',
+    #             'test_loss_cp',
+    #         ])
+    #         # Write data rows
+    #         for i in range(len(epoch_range)):
+    #             writer.writerow([
+    #                 epoch_range[i],
+    #                 train_loss_orig[i],
+    #                 test_loss_orig[i],
+    #                 train_loss_cp[i],
+    #                 test_loss_cp[i],
+    #                 train_loss_naive[i],
+    #                 test_loss_naive[i]
+    #             ])
     if save_pdf:
-        os.makedirs('LTH', exist_ok=True)
         fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
 
-        # Plot Train Loss vs. epoch
-        axs[0].plot(epoch_range, train_loss_cp, color='tab:orange',marker=None, markersize=2, label=f'Compressed d\'={dstop}')
-        axs[0].plot(epoch_range, train_loss_naive, color='tab:blue',  marker=None, markersize=2, label=f'Naive d\'={dstop}')
-        axs[0].plot(epoch_range, train_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
-        axs[0].set_ylabel('Train loss')
-        axs[0].set_yscale('log')
-        # axs[0].grid(True, linewidth=0.25)
-        axs[0].legend()
+        for n, d in enumerate(dlist):
+            axs[0].plot(epoch_range, test_losses[n], marker=None, ls='-', label=f"d={d}")
+            axs[1].plot(epoch_range, test_losses_cp[n], marker=None, ls='-', label=f"d'={dstop(d)}")
 
-        # Plot Test Loss vs. epoch
-        axs[1].plot(epoch_range, test_loss_cp, color='tab:orange', marker=None, markersize=2, label=f'Compressed d\'={dstop}')
-        axs[1].plot(epoch_range, test_loss_naive, color='tab:blue', marker=None, markersize=2, label=f'Naive d\'={dstop}')
-        axs[1].plot(epoch_range, test_loss_orig,  color='tab:green', marker=None, markersize=2, ls='--', label=f'Original d={d}')
-        axs[1].set_ylabel('Test loss')
+        axs[0].legend()
+        axs[0].set_ylabel('Test loss - orig')
+        axs[0].set_yscale('log')
+        axs[1].set_ylabel('Test loss - cp')
         axs[1].set_xlabel('Epoch')
         axs[1].set_yscale('log')
-        # axs[1].grid(True, linewidth=0.25)
 
         plt.tight_layout()
         plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)

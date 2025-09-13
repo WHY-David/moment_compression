@@ -232,7 +232,6 @@ def make_canvas(
     fontsize: float = 8.0,
     rows: int = 1,
     cols: int = 1,
-    **kwargs
 ):
     _PT_PER_IN = 72.0
     # Use PDF “base 14” fonts (Helvetica) — no TTF embedding, no fontTools warnings
@@ -260,4 +259,4 @@ def make_canvas(
     fig_h_pt = bottom_pt + axes_h_pt + top_pt
 
     # ax.grid(True, which="both", linestyle=":", linewidth=0.5)
-    return plt.subplots(rows, cols, figsize=(fig_w_pt/_PT_PER_IN, fig_h_pt/_PT_PER_IN), **kwargs)
+    return plt.subplots(rows, cols, figsize=(fig_w_pt/_PT_PER_IN, fig_h_pt/_PT_PER_IN), sharex=True)

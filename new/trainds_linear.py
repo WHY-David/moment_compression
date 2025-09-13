@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 import csv
 
-from common import TwoLayerNet, fix_random_seed, make_canvas, cyl_harmonic
+from common import fix_random_seed, make_canvas
 from data_gen import generate_data
 
 import sys

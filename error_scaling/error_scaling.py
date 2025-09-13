@@ -30,8 +30,8 @@ def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
 
 # determine the final data set size
 def dstop(d):
-    # return int(3.5*d**0.5)
-    return int(0.1*d)
+    return int(d**0.5)
+    # return int(0.1*d)
     # return 35
 
 def run_trial(args):
@@ -56,15 +56,15 @@ if __name__ == "__main__":
     # mlist = [1, 2, 3, 4, 5]
     # d_list = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000]
     # k_list = [1, 2, 3, 4, 5, 6]
-    mlist = [5]
+    mlist = [3]
     d_list = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000]
     k_list = [4, 5, 6]
-    trials_per_d = 20
+    trials_per_d = 10
     num_samples = 10
 
     tasks = [(m, k, d, t) for m in mlist for k in k_list for d in d_list for t in range(trials_per_d)]
 
-    out_path = "error_list.csv"
+    out_path = "sqrt_error_list.csv"
     file_exists = os.path.exists(out_path)
 
     # Open once and append rows as each trial completes; flush+fsync for durability
