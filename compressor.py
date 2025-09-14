@@ -181,8 +181,8 @@ class Compressor:
         # subset = np.asarray(subset, dtype=int)
         A = self.all_moments[:, subset]
         c = self.c_[subset].copy()
-        if np.any(c < -self.tol):
-            raise ValueError("c must be nonnegative (within tolerance).")
+        # if np.any(c < -self.tol):
+        #     raise ValueError("c must be nonnegative (within tolerance).")
         b = A@c
         target = A.shape[0]
 

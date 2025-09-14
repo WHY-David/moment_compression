@@ -255,9 +255,30 @@ def make_canvas(
         "mathtext.fontset": "stixsans",
     })
 
+    # Target axes (frame) size in points
     axes_h_pt = axes_width_pt * float(axes_aspect)
-    fig_w_pt = left_pt + axes_width_pt + right_pt
-    fig_h_pt = bottom_pt + axes_h_pt + top_pt
+    axes_width_pt /= cols
+    axes_h_pt /= rows
 
-    # ax.grid(True, which="both", linestyle=":", linewidth=0.5)
-    return plt.subplots(rows, cols, figsize=(fig_w_pt/_PT_PER_IN, fig_h_pt/_PT_PER_IN), **kwargs)
+    # Compute figure size (in points) to include requested fixed paddings
+    # This ensures the axes frame is exactly axes_width_pt x axes_h_pt,
+    # while the figure is expanded to include margins for labels, ticks, etc.
+    fig_w_pt = left_pt + cols * axes_width_pt + right_pt
+    fig_h_pt = bottom_pt + rows * axes_h_pt + top_pt
+
+    fig, ax = plt.subplots(rows, cols, figsize=(fig_w_pt/_PT_PER_IN, fig_h_pt/_PT_PER_IN), **kwargs)
+
+    # Convert absolute paddings (pt) to figure fractions and enforce them.
+    # This strictly fixes each axes' drawable area to the requested size.
+    left = left_pt / fig_w_pt
+    right = 1.0 - (right_pt / fig_w_pt)
+    bottom = bottom_pt / fig_h_pt
+    top = 1.0 - (top_pt / fig_h_pt)
+
+    # No inter-axes spacing by default so each axes frame has the exact size.
+    if rows == 1 and cols == 1:
+        fig.subplots_adjust(left=left, right=right, bottom=bottom, top=top)
+    else:
+        fig.subplots_adjust(left=left, right=right, bottom=bottom, top=top, wspace=0.0, hspace=0.0)
+
+    return fig, ax
