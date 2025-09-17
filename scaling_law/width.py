@@ -112,7 +112,7 @@ if __name__ == '__main__':
     fix_random_seed(seed)
 
     # Hyperparameters
-    dlist = [2**n for n in range(8,15)]
+    dlist = [2**n for n in range(8,16)]
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
     train_size = 10**7
@@ -192,4 +192,4 @@ if __name__ == '__main__':
 
         plt.tight_layout()
         plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
-        plt.show()
+        # plt.show()
