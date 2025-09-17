@@ -15,7 +15,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from compressor import Compressor
 
 # Device configuration
-# device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -61,7 +60,7 @@ def bptrain(net,
                seed=0,
                algo=torch.optim.SGD, 
                **opt_params):
-    """Train the baseline network. Returns (train_losses, test_losses) with snapshots per epoch (incl. epoch 0)."""
+    """Train the baseline network. Returns test_losses with snapshots at epoch 0, every 10 epochs, and the final epoch."""
     fix_random_seed(seed)
     train_loader = make_loader(train_ds, batch_size=batch_size, seed=seed)
     test_loader = make_loader(test_ds, batch_size=batch_size, seed=seed)
@@ -81,7 +80,6 @@ def bptrain(net,
         net.fc2.weight.register_hook(lambda grad: grad * inv_c.view(1, -1))
 
     # Initial evaluation (does not change mode due to compute_loss restoration)
-    train_losses = [compute_loss(net, train_loader, loss_fn)]
     test_losses = [compute_loss(net, test_loader, loss_fn)]
 
     for epoch in range(1, epochs+1):
@@ -96,14 +94,12 @@ def bptrain(net,
             opt.step()
         sched.step()
 
-        # End-of-epoch evaluation (compute_loss preserves/restores mode)
-        if epoch % 10 == 0:
-            trl = compute_loss(net, train_loader, loss_fn)
+        # End-of-epoch evaluation (always include final epoch; sample every 10)
+        if (epoch % 10 == 0) or (epoch == epochs):
             tel = compute_loss(net, test_loader, loss_fn)
-            train_losses.append(trl)
             test_losses.append(tel)
-            print(f"Epoch {epoch}/{epochs}. Train loss: {trl:.3e}, test loss: {tel:.3e}")
-    return train_losses, test_losses
+            print(f"Epoch {epoch}/{epochs}. Test loss: {tel:.3e}")
+    return test_losses
     
 
 
@@ -116,15 +112,15 @@ if __name__ == '__main__':
     fix_random_seed(seed)
 
     # Hyperparameters
-    dlist = [2**n for n in range(8,18)]
+    dlist = [2**n for n in range(8,15)]
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
-    train_size = 1_000_000
-    test_size = 100_000
+    train_size = 10**7
+    test_size = 10**5
     train_noise = 0.2
     tol = 1e-12
     epochs = 30
-    batch_size = 512
+    batch_size = 256
 
     # # Adam
     # algo_name = 'Adam'
@@ -151,9 +147,7 @@ if __name__ == '__main__':
     test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
     test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
-    train_losses = []
     test_losses = []
-    train_losses_cp = []
     test_losses_cp = []
 
     for d in dlist:
@@ -162,39 +156,26 @@ if __name__ == '__main__':
         print(f'Compression completed. d={d} -> dstop={dstop(d)}')
 
         # Train all cases with identical minibatches/order — sequential execution
-        train_loss, test_loss = bptrain(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-        train_loss_cp, test_loss_cp = bptrain(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-        train_losses.append(train_loss)
+        test_loss = bptrain(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
+        test_loss_cp = bptrain(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
         test_losses.append(test_loss)
-        train_losses_cp.append(train_loss_cp)
         test_losses_cp.append(test_loss_cp)
 
-    epoch_range = np.arange(0, epochs+1, 10)
+    # Match how test losses are sampled: epoch 0, every 10 epochs, and final epoch
+    epoch_range = [0] + list(range(10, epochs+1, 10))
+    if epoch_range[-1] != epochs:
+        epoch_range.append(epochs)
 
     os.makedirs('LTH', exist_ok=True)
     filename = f'LTH/{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
-    # if save_csv:
-    #     with open(filename + '.csv', 'w', newline='') as csvfile:
-    #         writer = csv.writer(csvfile)
-    #         # Write header
-    #         writer.writerow([
-    #             'epoch',
-    #             'train_loss_orig',
-    #             'test_loss_orig',
-    #             'train_loss_cp',
-    #             'test_loss_cp',
-    #         ])
-    #         # Write data rows
-    #         for i in range(len(epoch_range)):
-    #             writer.writerow([
-    #                 epoch_range[i],
-    #                 train_loss_orig[i],
-    #                 test_loss_orig[i],
-    #                 train_loss_cp[i],
-    #                 test_loss_cp[i],
-    #                 train_loss_naive[i],
-    #                 test_loss_naive[i]
-    #             ])
+    if save_csv:
+        with open(filename + '.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # Write header
+            writer.writerow(['d', 'test_loss_orig', 'test_loss_cp'])
+            # Write one row per width with final-epoch test losses
+            for n, d in enumerate(dlist):
+                writer.writerow([d, test_losses[n][-1], test_losses_cp[n][-1]])
     if save_pdf:
         fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
 
