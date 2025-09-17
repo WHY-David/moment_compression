@@ -61,6 +61,7 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=N
     fix_random_seed(seed)
     net = TwoLayerNet(2, hidden_dim).to(device)
     opt = algo(net.parameters(), **opt_params)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=0.)
 
     # initial losses
     train_losses = [compute_loss(net, train_loader, weights=train_weights)]
@@ -82,6 +83,7 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=N
                 loss = (w * sq_err).sum() / w.sum()
             loss.backward()
             opt.step()
+        sched.step()
 
         # record losses after the update
         train_loss = compute_loss(net, train_loader, weights=train_weights)
@@ -102,12 +104,12 @@ if __name__ == "__main__":
     train_noise = 3.0
     test_size = 100_000
     hidden_dim = 50
-    epochs = 600
+    epochs = 400
     batch_size = None
 
-    algo_name = 'AdamW'
-    lr = 1e-2
-    algo = torch.optim.AdamW
+    algo_name = 'SGD'
+    lr = 5e-2
+    algo = torch.optim.SGD
 
     fix_random_seed(seed*10)
     # f = lambda x, y: cyl_harmonic(x, y, n=10, k=50)

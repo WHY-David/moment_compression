@@ -102,31 +102,31 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=N
 if __name__ == "__main__":
     seed = 42
 
-    d = 100_000  # train size
+    d = 10_000  # train size
     dstop = 1_000 # compressed training dataset size
     k = 5
     train_noise = 3.0
     test_size = 100_000
     hidden_dim = 50
-    epochs = 300
+    epochs = 400
     batch_size = 256
 
-    algo_name = 'AdamW'
-    lr = 1e-3
-    algo = torch.optim.AdamW
+    algo_name = 'SGD'
+    lr = 1e-2
+    algo = torch.optim.SGD
 
-    task_name = 'harm'
+    task_name = 'teacher'
 
     fix_random_seed(seed*10)
-    f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
-    # truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
+    # f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
+    truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
 
-    train_data = generate_data(d, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
+    train_data = generate_data(d, net=truth_net, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
     cp = Compressor(train_data.to("cpu").numpy(), random_state=seed)
     c_, train_cp = cp.compress(k, dstop=dstop, print_progress=True)
     print(f"Compression completed. d={d} -> d'={dstop}")
     train_naive = train_data[:dstop, :]
-    test_data = generate_data(test_size, f=f, noise=0, seed=seed**3, return_tensor=True, device=device)
+    test_data = generate_data(test_size, net=truth_net, noise=0, seed=seed**3, return_tensor=True, device=device)
 
     train_loader = make_loader(train_data, num_samples=d, batch_size=batch_size)
     train_loader_cp = make_loader(train_cp, num_samples=d, batch_size=batch_size, weights=c_)

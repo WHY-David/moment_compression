@@ -122,9 +122,9 @@ if __name__ == "__main__":
     compute_budget = 16*131072
     batch_size = 512
 
-    algo_name = 'AdamW'
-    lr = 1e-3
-    algo = torch.optim.AdamW
+    algo_name = 'SGD'
+    lr = 1e-2
+    algo = torch.optim.SGD
 
     task_name = 'teacher'
 
