@@ -15,7 +15,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from compressor import Compressor
 
 # Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 
 def make_loader(dataset, batch_size=64, seed=0):
@@ -95,7 +96,7 @@ def bptrain(net,
         sched.step()
 
         # End-of-epoch evaluation (always include final epoch; sample every 10)
-        if (epoch % 10 == 0) or (epoch == epochs):
+        if (epoch % 1 == 0) or (epoch == epochs):
             tel = compute_loss(net, test_loader, loss_fn)
             test_losses.append(tel)
             print(f"Epoch {epoch}/{epochs}. Test loss: {tel:.3e}")
@@ -107,20 +108,18 @@ if __name__ == '__main__':
     save_csv = True
     save_pdf = True
 
-    # Determinism
-    seed = 42
-    fix_random_seed(seed)
+    dlist = [2**n for n in range(8,19)]
+    seedlist = range(8)
 
     # Hyperparameters
-    dlist = [2**n for n in range(8,16)]
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
     train_size = 10**7
     test_size = 10**5
     train_noise = 0.2
     tol = 1e-12
-    epochs = 30
-    batch_size = 256
+    epochs = 100
+    batch_size = 512
 
     # # Adam
     # algo_name = 'Adam'
@@ -140,56 +139,48 @@ if __name__ == '__main__':
     task_name = "harm"
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
     f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
-    # f = lambda x, y: x*y/(x**2+y**2)
-
-    train_data = generate_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
-    train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
-    test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
-    test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
-
-    test_losses = []
-    test_losses_cp = []
 
     for d in dlist:
-        net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
-        net_cp, weights_t = compress_nn(net_orig, dstop=dstop(d), k=k, tol=tol)
-        print(f'Compression completed. d={d} -> dstop={dstop(d)}')
+        for seed in seedlist:
+            # Determinism
+            fix_random_seed(seed)
 
-        # Train all cases with identical minibatches/order — sequential execution
-        test_loss = bptrain(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-        test_loss_cp = bptrain(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
-        test_losses.append(test_loss)
-        test_losses_cp.append(test_loss_cp)
+            train_data = generate_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
+            train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
+            test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
+            test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
-    # Match how test losses are sampled: epoch 0, every 10 epochs, and final epoch
-    epoch_range = [0] + list(range(10, epochs+1, 10))
-    if epoch_range[-1] != epochs:
-        epoch_range.append(epochs)
+            net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
+            net_cp, weights_t = compress_nn(net_orig, dstop=dstop(d), k=k, tol=tol)
+            print(f'Compression completed. d={d} -> dstop={dstop(d)}')
 
-    os.makedirs('LTH', exist_ok=True)
-    filename = f'LTH/{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
-    if save_csv:
-        with open(filename + '.csv', 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            # Write header
-            writer.writerow(['d', 'test_loss_orig', 'test_loss_cp'])
-            # Write one row per width with final-epoch test losses
-            for n, d in enumerate(dlist):
-                writer.writerow([d, test_losses[n][-1], test_losses_cp[n][-1]])
-    if save_pdf:
-        fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
+            # Train all cases with identical minibatches/order — sequential execution
+            test_loss = bptrain(net_orig, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
+            test_loss_cp = bptrain(net_cp, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
 
-        for n, d in enumerate(dlist):
-            axs[0].plot(epoch_range, test_losses[n], marker=None, ls='-', label=f"d={d}")
-            axs[1].plot(epoch_range, test_losses_cp[n], marker=None, ls='-', label=f"d'={dstop(d)}")
+            epoch_range = list(range(0, epochs+1))
 
-        axs[0].legend()
-        axs[0].set_ylabel('Test loss - orig')
-        axs[0].set_yscale('log')
-        axs[1].set_ylabel('Test loss - cp')
-        axs[1].set_xlabel('Epoch')
-        axs[1].set_yscale('log')
+            os.makedirs(f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}', exist_ok=True)
+            filename = f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}/d{d}_dstop{dstop(d)}_seed{seed}'
+            if save_csv:
+                with open(filename + '.csv', 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    # Write header
+                    writer.writerow(['d', 'test_loss_orig', 'test_loss_cp'])
+                    # Write one row per width with final-epoch test losses
+                    for n in epoch_range:
+                        writer.writerow([n, test_loss[n], test_loss_cp[n]])
+            if save_pdf:
+                fig, axs = make_canvas(rows=1, cols=1, axes_width_pt=200)
 
-        plt.tight_layout()
-        plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
-        # plt.show()
+                axs.plot(epoch_range, test_loss, marker=None, ls='-', label=f"d={d}")
+                axs.plot(epoch_range, test_loss_cp, marker=None, ls='--', label=f"d'={dstop(d)}")
+
+                axs.legend()
+                axs.set_ylabel('Test loss')
+                axs.set_yscale('log')
+                axs.set_xlabel('Epoch')
+
+                plt.tight_layout()
+                plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
+                # plt.show()

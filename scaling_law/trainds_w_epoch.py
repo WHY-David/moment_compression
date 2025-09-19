@@ -38,7 +38,7 @@ def make_loader(data, num_samples=None, batch_size=None, weights=None):
         sampler = torch.utils.data.WeightedRandomSampler(weights, num_samples=num_samples, replacement=True)
     return DataLoader(ds, batch_size=batch_size, sampler=sampler)
 
-def make_test_loader(data, batch_size=2048):
+def make_test_loader(data, batch_size=4096):
     if isinstance(data, np.ndarray):
         data = torch.from_numpy(data)
     X = data[:, :2].float().to(device)
@@ -47,38 +47,31 @@ def make_test_loader(data, batch_size=2048):
     ds = TensorDataset(X, y)
     return DataLoader(ds, batch_size=batch_size)
 
-def compute_loss(net, loader, weights=None):
-    """Manual MSE. If weights is None: (1/N) * sum_i ||f(x_i)-y_i||^2.
-    If weights given (length N): (1/sum w_i) * sum_i w_i * ||f(x_i)-y_i||^2.
-    Assumes full-batch DataLoader (one batch) and deterministic ordering.
-    """
+def compute_loss(net, loader):
+    loss_fn = nn.MSELoss(reduction="sum")
+    total_loss = 0.
+    total_samples = 0
+
     net.eval()
     with torch.no_grad():
-        for inputs, labels in loader:  # single full batch
+        for inputs, labels in loader:
             outputs = net(inputs)
-            sq_err = (outputs - labels).pow(2).squeeze(-1)  # shape (N,)
-            if weights is None:
-                loss = sq_err.mean()
-            else:
-                w = torch.as_tensor(weights, dtype=torch.float, device=inputs.device).view(-1)
-                loss = (w * sq_err).sum() / w.sum()
-            return loss.item()
+            loss = loss_fn(outputs, labels)
+            total_loss += loss.item()
+            total_samples += labels.numel()            
+    return total_loss/total_samples
 
-def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=None, seed=0, algo=torch.optim.SGD, **opt_params):
+def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, eval_every=16, seed=0, algo=torch.optim.SGD, **opt_params):
     fix_random_seed(seed)
     net = TwoLayerNet(2, hidden_dim).to(device)
     opt = algo(net.parameters(), **opt_params)
     loss_fn = nn.MSELoss()
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=0.)
 
-    # # initial losses
-    # train_losses = [compute_loss(net, train_loader, weights=None)]
-    # test_losses = [compute_loss(net, test_loader, weights=None)]
+    # initial losses
+    test_losses = [compute_loss(net, test_loader)]
 
-    # if train_weights is not None:
-    #     w = torch.as_tensor(train_weights, dtype=torch.float, device=device).view(-1)
-
-    print_fraction = 0
+    print_fraction = 0.
 
     for epoch in range(1, epochs + 1):
         net.train()
@@ -90,24 +83,21 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=N
             opt.step()
         sched.step()
 
-        # # record losses after the update
-        # train_loss = compute_loss(net, train_loader, weights=None)
-        # test_loss = compute_loss(net, test_loader, weights=None)
-        # train_losses.append(train_loss)
-        # test_losses.append(test_loss)
+        if epoch % 16 == 0:
+            test_loss = compute_loss(net, test_loader)
+            test_losses.append(test_loss)
 
         if epoch / epochs >= print_fraction:
-            # print(f"Epoch {epoch}/{epochs}. Train loss: {train_loss:.3e}, test loss: {test_loss:.3e}")
             print(f"Epoch {epoch}/{epochs}")
             print_fraction += 1/10
 
-    return compute_loss(net, train_loader), compute_loss(net, test_loader)
+    return test_losses
 
 if __name__ == "__main__":
     seed = 42
     num_seeds = 10
 
-    dlist = [2**n for n in range(8, 18)]
+    dlist = [2**n for n in range(8, 16)]
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
 
@@ -116,6 +106,7 @@ if __name__ == "__main__":
     hidden_dim = 50
     compute_budget = 16*131072
     batch_size = 512
+    epochs = compute_budget // batch_size
 
     algo_name = 'AdamW'
     lr = 1e-3
@@ -127,14 +118,11 @@ if __name__ == "__main__":
     test_losses_cp = []
 
     for d in dlist:
-        epochs = compute_budget // d
-
         runs_train = []
         runs_test = []
         runs_train_cp = []
         runs_test_cp = []
 
-        for s in range(num_seeds):
             seed_i = seed + d + s
 
             fix_random_seed(seed_i*10)
@@ -172,13 +160,7 @@ if __name__ == "__main__":
             runs_train_cp.append(train_loss_cp)
             runs_test_cp.append(test_loss_cp)
 
-        # Average across seeds for this d
-        avg_train = float(np.mean(runs_train))
-        avg_test = float(np.mean(runs_test))
-        avg_train_cp = float(np.mean(runs_train_cp))
-        avg_test_cp = float(np.mean(runs_test_cp))
 
-        print(f"Averaged over {num_seeds} seeds. d={d} -> d'={dstop(d)}")
 
         train_losses.append(avg_train)
         test_losses.append(avg_test)
