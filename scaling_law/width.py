@@ -16,7 +16,7 @@ from compressor import Compressor
 
 # Device configuration
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device = torch.device('cpu')
+device = torch.device('cuda')
 
 
 def make_loader(dataset, batch_size=64, seed=0):
