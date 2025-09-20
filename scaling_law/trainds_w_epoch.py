@@ -83,7 +83,7 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, eval_every=16, 
             opt.step()
         sched.step()
 
-        if epoch % 16 == 0:
+        if (epoch % eval_every == 0) or (epoch==epochs):
             test_loss = compute_loss(net, test_loader)
             test_losses.append(test_loss)
 
@@ -95,18 +95,19 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, eval_every=16, 
 
 if __name__ == "__main__":
     seed = 42
-    num_seeds = 10
+    # num_seeds = 10
 
-    dlist = [2**n for n in range(8, 16)]
+    dlist = [2**n for n in range(8, 20)]
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
 
     train_noise = 3.0
     test_size = 100_000
     hidden_dim = 50
-    compute_budget = 16*131072
+    compute_budget = 2**20
     batch_size = 512
     epochs = compute_budget // batch_size
+    eval_every = 16
 
     algo_name = 'AdamW'
     lr = 1e-3
@@ -114,108 +115,102 @@ if __name__ == "__main__":
 
     task_name = 'teacher'
 
-    test_losses = []
-    test_losses_cp = []
-
     for d in dlist:
-        runs_train = []
-        runs_test = []
-        runs_train_cp = []
-        runs_test_cp = []
+        test_losses = []
+        test_losses_cp = []
+        
+        fix_random_seed(seed*10)
+        # f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
+        truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
+        test_data = generate_data(test_size, net=truth_net, noise=0, seed=seed**3, return_tensor=True, device=device)
+        test_loader = make_test_loader(test_data)
 
-            seed_i = seed + d + s
+        # Generate training data with per-run seed
+        train_data = generate_data(
+            d,
+            net=truth_net,
+            noise=train_noise,
+            seed=seed**2 + d,
+            return_tensor=True,
+            device=device,
+        )
 
-            fix_random_seed(seed_i*10)
-            # f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
-            truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
-            test_data = generate_data(test_size, net=truth_net, noise=0, seed=seed_i**3, return_tensor=True, device=device)
-            test_loader = make_test_loader(test_data)
+        # Compress with per-run random state
+        cp = Compressor(train_data.to("cpu").numpy(), random_state=seed)
+        c_, train_cp = cp.compress(k, dstop=dstop(d), print_progress=False)
 
-            # Generate training data with per-run seed
-            train_data = generate_data(
-                d,
-                net=truth_net,
-                noise=train_noise,
-                seed=seed_i**2 + d,
-                return_tensor=True,
-                device=device,
-            )
+        train_loader = make_loader(train_data, num_samples=d, batch_size=min(batch_size, d//2))
+        train_loader_cp = make_loader(train_cp, num_samples=d, batch_size=min(batch_size, d//2), weights=c_)
 
-            # Compress with per-run random state
-            cp = Compressor(train_data.to("cpu").numpy(), random_state=seed_i)
-            c_, train_cp = cp.compress(k, dstop=dstop(d), print_progress=False)
+        test_loss = bptrain(
+            train_loader, test_loader, hidden_dim, epochs=epochs, seed=seed, eval_every=16, algo=algo, lr=lr
+        )
+        test_loss_cp = bptrain(
+            train_loader_cp, test_loader, hidden_dim, epochs=epochs, seed=seed, eval_every=16, algo=algo, lr=lr
+        )
 
-            train_loader = make_loader(train_data, num_samples=d, batch_size=min(batch_size, d//2))
-            train_loader_cp = make_loader(train_cp, num_samples=d, batch_size=min(batch_size, d//2), weights=c_)
-
-            train_loss, test_loss = bptrain(
-                train_loader, test_loader, hidden_dim, epochs=epochs, seed=seed_i, algo=algo, lr=lr
-            )
-            train_loss_cp, test_loss_cp = bptrain(
-                train_loader_cp, test_loader, hidden_dim, epochs=epochs, seed=seed_i, algo=algo, lr=lr
-            )
-
-            runs_train.append(train_loss)
-            runs_test.append(test_loss)
-            runs_train_cp.append(train_loss_cp)
-            runs_test_cp.append(test_loss_cp)
+        test_losses.append(test_loss)
+        test_losses_cp.append(test_loss_cp)
 
 
-
-        train_losses.append(avg_train)
-        test_losses.append(avg_test)
-        train_losses_cp.append(avg_train_cp)
-        test_losses_cp.append(avg_test_cp)
+    print("original test losses:\n")
+    for loss in test_losses:
+        print(f"{loss[-1]:.4f}", end=", ")
+    print("\ncompressed test losses:\n")
+    for loss in test_losses_cp:
+        print(f"{loss[-1]:.4f}", end=", ")
 
     # plots
-    # epoch_range = list(range(epochs+1))
-    # fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
+    epoch_range = list(range(0, epochs+1, eval_every))
+    if epoch_range[-1] != epochs:
+        epoch_range.append(epochs)
+    fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
 
-    # for n, d in enumerate(dlist):
-    #     axs[0].plot(epoch_range, test_losses[n], marker=None, ls='-', label=f"d={d}")
-    #     axs[1].plot(epoch_range, test_losses_cp[n], marker=None, ls='-', label=f"d'={dstop(d)}")
+    for n, d in enumerate(dlist):
+        axs[0].plot(epoch_range, test_losses[n], marker=None, ls='-', label=f"d={d}")
+        axs[1].plot(epoch_range, test_losses_cp[n], marker=None, ls='-', label=f"d'={dstop(d)}")
 
-    # axs[0].legend()
-    # axs[0].set_ylabel('Test loss - orig')
-    # axs[0].set_yscale('log')
-    # axs[1].set_ylabel('Test loss - cp')
-    # axs[1].set_xlabel('Epoch')
-    # axs[1].set_yscale('log')
+    axs[0].legend()
+    axs[0].set_ylabel('Test loss - orig')
+    axs[0].set_yscale('log')
+    axs[1].set_ylabel('Test loss - cp')
+    axs[1].set_xlabel('Epoch')
+    axs[1].set_yscale('log')
 
-    fig, ax = make_canvas(axes_width_pt=300)
-    ax.plot(dlist, test_losses, marker='o', ls='-', label=f"Original")
-    ax.plot([dstop(d) for d in dlist], test_losses_cp, marker=None, ls='^', label=f"Compressed")
+    # fig, ax = make_canvas(axes_width_pt=300)
+    # ax.plot(dlist, test_losses, marker='o', ls='-', label=f"Original")
+    # ax.plot([dstop(d) for d in dlist], test_losses_cp, marker=None, ls='^', label=f"Compressed")
 
-    ax.legend()
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_ylabel("Test loss")
-    ax.set_xlabel("dataset size")
-    ax.set_title(r"$d\to 8\sqrt{d}$")
-    plt.tight_layout()
+    # ax.legend()
+    # ax.set_xscale("log")
+    # ax.set_yscale("log")
+    # ax.set_ylabel("Test loss")
+    # ax.set_xlabel("dataset size")
+    # ax.set_title(r"$d\to 8\sqrt{d}$")
+    # plt.tight_layout()
 
-    os.makedirs('CPTDS', exist_ok=True)
-    filename = f'CPTDS/{task_name}_{algo_name}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
-    with open(filename + '.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        # Write header
-        writer.writerow([
-            'd',
-            'dstop',
-            'train_loss_orig',
-            'test_loss_orig',
-            'train_loss_cp',
-            'test_loss_cp',
-        ])
-        # Write data rows
-        for n in range(len(dlist)):
-            writer.writerow([
-                dlist[n],
-                dstop(dlist[n]),
-                train_losses[n],
-                test_losses[n],
-                train_losses_cp[n],
-                test_losses_cp[n]
-            ])
-    plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
+    # os.makedirs('CPTDS', exist_ok=True)
+    # filename = f'CPTDS/{task_name}_{algo_name}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
+    # with open(filename + '.csv', 'w', newline='') as csvfile:
+    #     writer = csv.writer(csvfile)
+    #     # Write header
+    #     writer.writerow([
+    #         'd',
+    #         'dstop',
+    #         'train_loss_orig',
+    #         'test_loss_orig',
+    #         'train_loss_cp',
+    #         'test_loss_cp',
+    #     ])
+    #     # Write data rows
+    #     for n in range(len(dlist)):
+    #         writer.writerow([
+    #             dlist[n],
+    #             dstop(dlist[n]),
+    #             train_losses[n],
+    #             test_losses[n],
+    #             train_losses_cp[n],
+    #             test_losses_cp[n]
+    #         ])
+    # plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
     plt.show()

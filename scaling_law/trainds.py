@@ -38,7 +38,7 @@ def make_loader(data, num_samples=None, batch_size=None, weights=None):
         sampler = torch.utils.data.WeightedRandomSampler(weights, num_samples=num_samples, replacement=True)
     return DataLoader(ds, batch_size=batch_size, sampler=sampler)
 
-def make_test_loader(data, batch_size=2048):
+def make_test_loader(data, batch_size=4096):
     if isinstance(data, np.ndarray):
         data = torch.from_numpy(data)
     X = data[:, :2].float().to(device)
@@ -47,24 +47,22 @@ def make_test_loader(data, batch_size=2048):
     ds = TensorDataset(X, y)
     return DataLoader(ds, batch_size=batch_size)
 
-def compute_loss(net, loader, weights=None):
-    """Manual MSE. If weights is None: (1/N) * sum_i ||f(x_i)-y_i||^2.
-    If weights given (length N): (1/sum w_i) * sum_i w_i * ||f(x_i)-y_i||^2.
-    Assumes full-batch DataLoader (one batch) and deterministic ordering.
-    """
+
+def compute_loss(net, loader):
+    loss_fn = nn.MSELoss(reduction="sum")
+    total_loss = 0.
+    total_samples = 0
+
     net.eval()
     with torch.no_grad():
-        for inputs, labels in loader:  # single full batch
+        for inputs, labels in loader:
             outputs = net(inputs)
-            sq_err = (outputs - labels).pow(2).squeeze(-1)  # shape (N,)
-            if weights is None:
-                loss = sq_err.mean()
-            else:
-                w = torch.as_tensor(weights, dtype=torch.float, device=inputs.device).view(-1)
-                loss = (w * sq_err).sum() / w.sum()
-            return loss.item()
+            loss = loss_fn(outputs, labels)
+            total_loss += loss.item()
+            total_samples += labels.numel()            
+    return total_loss/total_samples
 
-def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=None, seed=0, algo=torch.optim.SGD, **opt_params):
+def bptrain(train_loader, test_loader, hidden_dim:int, eval_every=16, epochs=5, seed=0, algo=torch.optim.SGD, **opt_params):
     fix_random_seed(seed)
     net = TwoLayerNet(2, hidden_dim).to(device)
     opt = algo(net.parameters(), **opt_params)
@@ -78,7 +76,7 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=N
     # if train_weights is not None:
     #     w = torch.as_tensor(train_weights, dtype=torch.float, device=device).view(-1)
 
-    print_fraction = 0
+    # print_fraction = 0
 
     for epoch in range(1, epochs + 1):
         net.train()
@@ -96,144 +94,86 @@ def bptrain(train_loader, test_loader, hidden_dim:int, epochs=5, train_weights=N
         # train_losses.append(train_loss)
         # test_losses.append(test_loss)
 
-        if epoch / epochs >= print_fraction:
-            # print(f"Epoch {epoch}/{epochs}. Train loss: {train_loss:.3e}, test loss: {test_loss:.3e}")
-            print(f"Epoch {epoch}/{epochs}")
-            print_fraction += 1/10
+        # if epoch / epochs >= print_fraction:
+        #     # print(f"Epoch {epoch}/{epochs}. Train loss: {train_loss:.3e}, test loss: {test_loss:.3e}")
+        #     print(f"Epoch {epoch}/{epochs}")
+        #     print_fraction += 1/10
 
-    return compute_loss(net, train_loader), compute_loss(net, test_loader)
+    return compute_loss(net, test_loader)
 
-if __name__ == "__main__":
-    seed = 42
-    num_seeds = 10
-
-    dlist = [2**n for n in range(8, 18)]
+def main(d, seed):
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
 
     train_noise = 3.0
     test_size = 100_000
     hidden_dim = 50
-    compute_budget = 16*131072
+    compute_budget = 2**20
     batch_size = 512
+    epochs = compute_budget // batch_size
 
     algo_name = 'AdamW'
     lr = 1e-3
     algo = torch.optim.AdamW
-
     task_name = 'teacher'
 
-    test_losses = []
-    test_losses_cp = []
+    fix_random_seed(seed*10)
+    # f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
+    truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
+    test_data = generate_data(test_size, net=truth_net, noise=0, seed=seed**3, return_tensor=True, device=device)
+    test_loader = make_test_loader(test_data)
 
-    for d in dlist:
-        epochs = compute_budget // d
+    # Generate training data with per-run seed
+    train_data = generate_data(
+        d,
+        net=truth_net,
+        noise=train_noise,
+        seed=seed**2 + d,
+        return_tensor=True,
+        device=device,
+    )
 
-        runs_train = []
-        runs_test = []
-        runs_train_cp = []
-        runs_test_cp = []
+    # Compress with per-run random state
+    cp = Compressor(train_data.to("cpu").numpy(), random_state=seed)
+    c_, train_cp = cp.compress(k, dstop=dstop(d), print_progress=False)
 
-        for s in range(num_seeds):
-            seed_i = seed + d + s
+    train_loader = make_loader(train_data, num_samples=d, batch_size=min(batch_size, d//2))
+    train_loader_cp = make_loader(train_cp, num_samples=d, batch_size=min(batch_size, d//2), weights=c_)
 
-            fix_random_seed(seed_i*10)
-            # f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
-            truth_net = TwoLayerNet(2, hidden_dim, init_uniform=1.).to(device)
-            test_data = generate_data(test_size, net=truth_net, noise=0, seed=seed_i**3, return_tensor=True, device=device)
-            test_loader = make_test_loader(test_data)
+    test_loss = bptrain(
+        train_loader, test_loader, hidden_dim, epochs=epochs, seed=seed, algo=algo, lr=lr
+    )
+    test_loss_cp = bptrain(
+        train_loader_cp, test_loader, hidden_dim, epochs=epochs, seed=seed, algo=algo, lr=lr
+    )
 
-            # Generate training data with per-run seed
-            train_data = generate_data(
-                d,
-                net=truth_net,
-                noise=train_noise,
-                seed=seed_i**2 + d,
-                return_tensor=True,
-                device=device,
-            )
+    return test_loss, test_loss_cp
 
-            # Compress with per-run random state
-            cp = Compressor(train_data.to("cpu").numpy(), random_state=seed_i)
-            c_, train_cp = cp.compress(k, dstop=dstop(d), print_progress=False)
 
-            train_loader = make_loader(train_data, num_samples=d, batch_size=min(batch_size, d//2))
-            train_loader_cp = make_loader(train_cp, num_samples=d, batch_size=min(batch_size, d//2), weights=c_)
+if __name__ == "__main__":
+    seedlist = list(range(20))
+    dlist = [2**n for n in range(8, 20)]
 
-            train_loss, test_loss = bptrain(
-                train_loader, test_loader, hidden_dim, epochs=epochs, seed=seed_i, algo=algo, lr=lr
-            )
-            train_loss_cp, test_loss_cp = bptrain(
-                train_loader_cp, test_loader, hidden_dim, epochs=epochs, seed=seed_i, algo=algo, lr=lr
-            )
-
-            runs_train.append(train_loss)
-            runs_test.append(test_loss)
-            runs_train_cp.append(train_loss_cp)
-            runs_test_cp.append(test_loss_cp)
-
-        # Average across seeds for this d
-        avg_train = float(np.mean(runs_train))
-        avg_test = float(np.mean(runs_test))
-        avg_train_cp = float(np.mean(runs_train_cp))
-        avg_test_cp = float(np.mean(runs_test_cp))
-
-        print(f"Averaged over {num_seeds} seeds. d={d} -> d'={dstop(d)}")
-
-        train_losses.append(avg_train)
-        test_losses.append(avg_test)
-        train_losses_cp.append(avg_train_cp)
-        test_losses_cp.append(avg_test_cp)
-
-    # plots
-    # epoch_range = list(range(epochs+1))
-    # fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
-
-    # for n, d in enumerate(dlist):
-    #     axs[0].plot(epoch_range, test_losses[n], marker=None, ls='-', label=f"d={d}")
-    #     axs[1].plot(epoch_range, test_losses_cp[n], marker=None, ls='-', label=f"d'={dstop(d)}")
-
-    # axs[0].legend()
-    # axs[0].set_ylabel('Test loss - orig')
-    # axs[0].set_yscale('log')
-    # axs[1].set_ylabel('Test loss - cp')
-    # axs[1].set_xlabel('Epoch')
-    # axs[1].set_yscale('log')
-
-    fig, ax = make_canvas(axes_width_pt=300)
-    ax.plot(dlist, test_losses, marker='o', ls='-', label=f"Original")
-    ax.plot([dstop(d) for d in dlist], test_losses_cp, marker=None, ls='^', label=f"Compressed")
-
-    ax.legend()
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_ylabel("Test loss")
-    ax.set_xlabel("dataset size")
-    ax.set_title(r"$d\to 8\sqrt{d}$")
-    plt.tight_layout()
-
-    os.makedirs('CPTDS', exist_ok=True)
-    filename = f'CPTDS/{task_name}_{algo_name}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
-    with open(filename + '.csv', 'w', newline='') as csvfile:
+    with open('trainds_scaling.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         # Write header
         writer.writerow([
+            'seed',
             'd',
             'dstop',
-            'train_loss_orig',
             'test_loss_orig',
-            'train_loss_cp',
             'test_loss_cp',
         ])
-        # Write data rows
-        for n in range(len(dlist)):
-            writer.writerow([
-                dlist[n],
-                dstop(dlist[n]),
-                train_losses[n],
-                test_losses[n],
-                train_losses_cp[n],
-                test_losses_cp[n]
-            ])
-    plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
-    plt.show()
+        
+        # evaluate and write data rows
+        for d in dlist:
+            for seed in seedlist:
+                test_loss, test_loss_cp = main(d, seed)
+                writer.writerow([
+                    seed,
+                    d,
+                    int(16*np.sqrt(d)),
+                    test_loss,
+                    test_loss_cp
+                ])
+                print(f"seed={seed}, d={d} done.")
