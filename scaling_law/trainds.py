@@ -152,18 +152,23 @@ def main(d, seed):
 
 if __name__ == "__main__":
     seedlist = list(range(20))
-    dlist = [2**n for n in range(8, 20)]
+    dlist = [2**n for n in range(17, 20)]
 
-    with open('trainds_scaling.csv', 'w', newline='') as csvfile:
+    csv_path = 'trainds_scaling.csv'
+    file_exists = os.path.exists(csv_path)
+    write_header = (not file_exists) or os.path.getsize(csv_path) == 0
+
+    mode = 'a' if file_exists else 'w'
+    with open(csv_path, mode, newline='') as csvfile:
         writer = csv.writer(csvfile)
-        # Write header
-        writer.writerow([
-            'seed',
-            'd',
-            'dstop',
-            'test_loss_orig',
-            'test_loss_cp',
-        ])
+        if write_header:
+            writer.writerow([
+                'seed',
+                'd',
+                'dstop',
+                'test_loss_orig',
+                'test_loss_cp',
+            ])
         
         # evaluate and write data rows
         for d in dlist:
