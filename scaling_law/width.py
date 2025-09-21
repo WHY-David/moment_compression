@@ -67,7 +67,7 @@ def train_pair(net_orig: nn.Module,
                **opt_params):
     """Train original and compressed networks side-by-side using shared minibatches."""
     # set_training_seed(seed)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=4, persistent_workers=True)
+    train_loader = DataLoader(train_ds, batch_size=batch_size)
     test_loader = DataLoader(test_ds, batch_size=len(test_ds))
     loss_fn = nn.MSELoss()
 
@@ -77,7 +77,7 @@ def train_pair(net_orig: nn.Module,
     sched_cp = torch.optim.lr_scheduler.CosineAnnealingLR(opt_cp, T_max=epochs, eta_min=0.)
 
     use_amp = device.type == 'cuda'
-    scaler = GradScaler('cuda', enabled=use_amp)
+    scaler = GradScaler(device.type, enabled=use_amp)
 
     if isinstance(net_cp, WeightedTwoLayerNet):
         weights_t = net_cp.weights
@@ -103,7 +103,7 @@ def train_pair(net_orig: nn.Module,
             opt_orig.zero_grad(set_to_none=True)
             opt_cp.zero_grad(set_to_none=True)
 
-            with autocast(enabled=use_amp):
+            with autocast(device.type, enabled=use_amp):
                 outputs_orig = net_orig(inputs)
                 outputs_cp = net_cp(inputs)
                 loss_orig = loss_fn(outputs_orig, labels)
