@@ -3,7 +3,7 @@ import random
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-from torch.amp import autocast, GradScaler
+# from torch.amp import autocast, GradScaler
 from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 import csv
@@ -77,7 +77,7 @@ def train_pair(net_orig: nn.Module,
     sched_cp = torch.optim.lr_scheduler.CosineAnnealingLR(opt_cp, T_max=epochs, eta_min=0.)
 
     use_amp = device.type == 'cuda'
-    scaler = GradScaler(device.type, enabled=use_amp)
+    # scaler = GradScaler(device.type, enabled=use_amp)
 
     if isinstance(net_cp, WeightedTwoLayerNet):
         weights_t = net_cp.weights
@@ -103,12 +103,12 @@ def train_pair(net_orig: nn.Module,
             opt_orig.zero_grad(set_to_none=True)
             opt_cp.zero_grad(set_to_none=True)
 
-            with autocast(device.type, enabled=use_amp):
-                outputs_orig = net_orig(inputs)
-                outputs_cp = net_cp(inputs)
-                loss_orig = loss_fn(outputs_orig, labels)
-                loss_cp = loss_fn(outputs_cp, labels)
-                loss_total = loss_orig + loss_cp
+            # with autocast(device.type, enabled=use_amp):
+            outputs_orig = net_orig(inputs)
+            outputs_cp = net_cp(inputs)
+            loss_orig = loss_fn(outputs_orig, labels)
+            loss_cp = loss_fn(outputs_cp, labels)
+            loss_total = loss_orig + loss_cp
 
             if use_amp:
                 scaler.scale(loss_total).backward()
