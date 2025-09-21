@@ -178,6 +178,10 @@ def fix_random_seed(seed=0):
     np.random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
 
+    # CUDA requires a workspace setting for deterministic cuBLAS kernels
+    if torch.cuda.is_available():
+        os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG', ':4096:8')
+
     torch.manual_seed(seed)
 
     # Enforce deterministic algorithms where available
