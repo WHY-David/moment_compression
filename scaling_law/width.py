@@ -67,7 +67,7 @@ def train_pair(net_orig: nn.Module,
                **opt_params):
     """Train original and compressed networks side-by-side using shared minibatches."""
     # set_training_seed(seed)
-    train_loader = DataLoader(train_ds, batch_size=batch_size)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=4)
     test_loader = DataLoader(test_ds, batch_size=len(test_ds))
     loss_fn = nn.MSELoss()
 
