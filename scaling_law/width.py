@@ -3,7 +3,7 @@ import random
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 import csv
@@ -67,8 +67,8 @@ def train_pair(net_orig: nn.Module,
                **opt_params):
     """Train original and compressed networks side-by-side using shared minibatches."""
     # set_training_seed(seed)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=4, pin_memory=True, persistent_workers=True)
-    test_loader = DataLoader(test_ds, batch_size=len(test_ds), pin_memory=True)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=4, persistent_workers=True)
+    test_loader = DataLoader(test_ds, batch_size=len(test_ds))
     loss_fn = nn.MSELoss()
 
     opt_orig = algo(net_orig.parameters(), **opt_params)
@@ -77,7 +77,7 @@ def train_pair(net_orig: nn.Module,
     sched_cp = torch.optim.lr_scheduler.CosineAnnealingLR(opt_cp, T_max=epochs, eta_min=0.)
 
     use_amp = device.type == 'cuda'
-    scaler = GradScaler(enabled=use_amp)
+    scaler = GradScaler('cuda', enabled=use_amp)
 
     if isinstance(net_cp, WeightedTwoLayerNet):
         weights_t = net_cp.weights
