@@ -137,8 +137,13 @@ if __name__ == '__main__':
     save_csv = True
     save_pdf = True
 
-    seed = 42
-    dlist = [2**n for n in range(8,10)]
+    # seed = 42
+    # dlist = [2**n for n in range(8,10)]
+    sid = int(os.environ["SLURM_ARRAY_TASK_ID"])
+    seed = sid % 20
+    log2d = sid // 20
+    d = 2**log2d
+    print(f'SLURM_ARRAY_TASK_ID={sid} -> seed={seed}, d={d}')
 
     # Hyperparameters
     dstop = lambda d: int(16*np.sqrt(d))
@@ -147,7 +152,7 @@ if __name__ == '__main__':
     test_size = 10**5
     train_noise = 0.2
     tol = 1e-12
-    epochs = 100
+    epochs = 200
     batch_size = 512
 
     # AdamW
@@ -159,53 +164,52 @@ if __name__ == '__main__':
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
     f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
 
-    for d in dlist:
-        train_data = generate_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
-        train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
+    train_data = generate_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
+    train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
 
-        test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
-        test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
+    test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
+    test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
-        net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
-        net_cp, _ = compress_nn(net_orig, dstop=dstop(d), k=k, tol=tol)
-        print(f'Compression completed. d={d} -> dstop={dstop(d)}')
+    net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
+    net_cp, _ = compress_nn(net_orig, dstop=dstop(d), k=k, tol=tol)
+    print(f'Compression completed. d={d} -> dstop={dstop(d)}')
 
-        # Train all cases with identical minibatches/order — sequential execution
-        test_loss, test_loss_cp = train_pair(
-            net_orig,
-            net_cp,
-            train_ds,
-            test_ds,
-            epochs=epochs,
-            batch_size=batch_size,
-            seed=seed,
-            algo=algo,
-            lr=lr,
-        )
+    # Train all cases with identical minibatches/order — sequential execution
+    test_loss, test_loss_cp = train_pair(
+        net_orig,
+        net_cp,
+        train_ds,
+        test_ds,
+        epochs=epochs,
+        batch_size=batch_size,
+        seed=seed,
+        algo=algo,
+        lr=lr,
+    )
 
-        epoch_range = list(range(0, epochs+1))
+    epoch_range = list(range(0, epochs+1))
 
-        os.makedirs(f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}', exist_ok=True)
-        filename = f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}/d{d}_dstop{dstop(d)}'
-        if save_csv:
-            with open(filename + '.csv', 'w', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                # Write header
-                writer.writerow(['d', 'test_loss_orig', 'test_loss_cp'])
-                # Write one row per width with final-epoch test losses
-                for n in epoch_range:
-                    writer.writerow([n, test_loss[n], test_loss_cp[n]])
-        if save_pdf:
-            fig, axs = make_canvas(rows=1, cols=1, axes_width_pt=200)
+    os.makedirs(f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}', exist_ok=True)
+    filename = f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}/d{d}_dstop{dstop(d)}_seed{seed}'
+    if save_csv:
+        with open(filename + '.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # Write header
+            writer.writerow(['d', 'test_loss_orig', 'test_loss_cp'])
+            # Write one row per width with final-epoch test losses
+            for n in epoch_range:
+                writer.writerow([n, test_loss[n], test_loss_cp[n]])
+    if save_pdf and seed == 0:
+        fig, axs = make_canvas(rows=1, cols=1, axes_width_pt=200)
 
-            axs.plot(epoch_range, test_loss, marker=None, ls='-', label=f"d={d}")
-            axs.plot(epoch_range, test_loss_cp, marker=None, ls='--', label=f"d'={dstop(d)}")
+        axs.plot(epoch_range, test_loss, marker=None, ls='-', label=f"d={d}")
+        axs.plot(epoch_range, test_loss_cp, marker=None, ls='--', label=f"d'={dstop(d)}")
 
-            axs.legend()
-            axs.set_ylabel('Test loss')
-            axs.set_yscale('log')
-            axs.set_xlabel('Epoch')
+        axs.legend()
+        axs.set_ylabel('Test loss')
+        axs.set_yscale('log')
+        axs.set_xlabel('Epoch')
 
-            plt.tight_layout()
-            plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
-            # plt.show()
+        plt.tight_layout()
+        plt.savefig(filename+'.pdf', format='pdf', bbox_inches='tight', pad_inches=0)
+        # plt.show()

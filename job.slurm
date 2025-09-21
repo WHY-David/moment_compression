@@ -5,6 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=1G         # memory per cpu-core (4G is default)
+#SBATCH --array=160-439
 #SBATCH --time=23:59:00          # total run time limit (HH:MM:SS)
 #SBATCH --mail-type=all
 #SBATCH --mail-user=hywang@princeton.edu
@@ -15,5 +16,5 @@ conda activate torch-env
 
 export OMP_NUM_THREADS=1
 
-cd scaling_law
+cd scaling_law/
 python width.py

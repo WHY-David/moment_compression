@@ -1,1 +1,273 @@
-slurmstepd: error: *** JOB 723318 ON della-r3c3n1 CANCELLED AT 2025-09-17T16:45:59 ***
+Epoch 2/100. Test loss: orig=3.665e-03, cp=3.918e-03
+/var/spool/slurmd/job813835/slurm_script: line 20: 3014108 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813835.batch. Some of the step tasks have been OOM Killed.
+Epoch 4/100. Test loss: orig=5.603e-03, cp=6.059e-03
+Epoch 3/100. Test loss: orig=4.691e-03, cp=4.761e-03
+Epoch 4/100. Test loss: orig=5.836e-03, cp=5.991e-03
+Epoch 5/100. Test loss: orig=8.966e-03, cp=8.966e-03
+Epoch 6/100. Test loss: orig=6.436e-03, cp=6.436e-03
+Epoch 4/100. Test loss: orig=5.556e-03, cp=5.914e-03
+Epoch 5/100. Test loss: orig=6.739e-03, cp=6.739e-03
+Epoch 4/100. Test loss: orig=6.898e-03, cp=7.729e-03
+/var/spool/slurmd/job813830/slurm_script: line 20: 3014098 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813830.batch. Some of the step tasks have been OOM Killed.
+Epoch 2/100. Test loss: orig=3.848e-03, cp=4.264e-03
+Epoch 5/100. Test loss: orig=7.234e-03, cp=7.234e-03
+Epoch 2/100. Test loss: orig=4.508e-03, cp=5.086e-03
+/var/spool/slurmd/job813839/slurm_script: line 20: 2557074 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813839.batch. Some of the step tasks have been OOM Killed.
+Epoch 5/100. Test loss: orig=7.974e-03, cp=7.974e-03
+/var/spool/slurmd/job813838/slurm_script: line 20: 3014107 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813838.batch. Some of the step tasks have been OOM Killed.
+Epoch 3/100. Test loss: orig=4.517e-03, cp=5.055e-03
+slurmstepd: error: *** JOB 813681 ON della-i13n25 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813683 ON della-r3c1n7 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813682 ON della-r3c1n1 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813688 ON della-r3c1n9 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813699 ON della-r3c3n2 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813691 ON della-r3c1n10 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813694 ON della-r3c1n15 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813695 ON della-r3c1n15 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813692 ON della-r3c1n14 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813687 ON della-r3c1n9 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813697 ON della-r3c3n1 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813685 ON della-r3c1n7 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813696 ON della-r3c1n15 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813686 ON della-r3c1n9 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813703 ON della-r3c3n8 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813698 ON della-r3c3n1 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813704 ON della-r3c3n10 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813693 ON della-r3c1n14 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813700 ON della-r3c3n2 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813701 ON della-r3c3n3 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813702 ON della-r3c3n3 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813690 ON della-r3c1n10 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813705 ON della-r3c3n12 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813706 ON della-r3c3n12 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813708 ON della-r3c4n7 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813689 ON della-r3c1n9 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813707 ON della-r3c4n7 CANCELLED AT 2025-09-21T01:18:15 ***
+slurmstepd: error: *** JOB 813709 ON della-r3c4n8 CANCELLED AT 2025-09-21T01:18:16 ***
+slurmstepd: error: *** JOB 813719 ON della-r3c2n3 CANCELLED AT 2025-09-21T01:18:16 ***
+/var/spool/slurmd/job813833/slurm_script: line 20: 3014106 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813833.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813720 ON della-r3c2n6 CANCELLED AT 2025-09-21T01:18:17 ***
+slurmstepd: error: *** JOB 813721 ON della-r3c2n6 CANCELLED AT 2025-09-21T01:18:17 ***
+Epoch 2/100. Test loss: orig=4.816e-03, cp=4.772e-03
+/var/spool/slurmd/job813837/slurm_script: line 20: 3014102 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813837.batch. Some of the step tasks have been OOM Killed.
+/var/spool/slurmd/job813836/slurm_script: line 20: 3014105 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813836.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813710 ON della-r3c4n10 CANCELLED AT 2025-09-21T01:18:18 ***
+slurmstepd: error: *** JOB 813711 ON della-r3c4n12 CANCELLED AT 2025-09-21T01:18:18 ***
+slurmstepd: error: *** JOB 813723 ON della-r3c2n6 CANCELLED AT 2025-09-21T01:18:19 ***
+slurmstepd: error: *** JOB 813724 ON della-r3c2n9 CANCELLED AT 2025-09-21T01:18:19 ***
+Epoch 4/100. Test loss: orig=5.740e-03, cp=6.001e-03
+slurmstepd: error: *** JOB 813725 ON della-r3c2n9 CANCELLED AT 2025-09-21T01:18:20 ***
+slurmstepd: error: *** JOB 813722 ON della-r3c2n6 CANCELLED AT 2025-09-21T01:18:20 ***
+/var/spool/slurmd/job813828/slurm_script: line 20: 3014097 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813828.batch. Some of the step tasks have been OOM Killed.
+/var/spool/slurmd/job813829/slurm_script: line 20: 3014100 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813829.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813712 ON della-r3c4n12 CANCELLED AT 2025-09-21T01:18:21 ***
+slurmstepd: error: *** JOB 813713 ON della-r3c4n12 CANCELLED AT 2025-09-21T01:18:21 ***
+slurmstepd: error: *** JOB 813729 ON della-r3c2n16 CANCELLED AT 2025-09-21T01:18:22 ***
+slurmstepd: error: *** JOB 813730 ON della-r3c2n16 CANCELLED AT 2025-09-21T01:18:22 ***
+Epoch 2/100. Test loss: orig=4.559e-03, cp=4.740e-03
+Epoch 2/100. Test loss: orig=3.892e-03, cp=4.160e-03
+Epoch 2/100. Test loss: orig=3.897e-03, cp=4.092e-03
+slurmstepd: error: *** JOB 813731 ON della-i13n5 CANCELLED AT 2025-09-21T01:18:23 ***
+slurmstepd: error: *** JOB 813732 ON della-i13n15 CANCELLED AT 2025-09-21T01:18:23 ***
+slurmstepd: error: *** JOB 813733 ON della-i13n15 CANCELLED AT 2025-09-21T01:18:24 ***
+slurmstepd: error: *** JOB 813734 ON della-i13n15 CANCELLED AT 2025-09-21T01:18:24 ***
+slurmstepd: error: *** JOB 813714 ON della-r3c4n13 CANCELLED AT 2025-09-21T01:18:25 ***
+slurmstepd: error: *** JOB 813715 ON della-r3c4n16 CANCELLED AT 2025-09-21T01:18:25 ***
+Epoch 2/100. Test loss: orig=4.280e-03, cp=4.392e-03
+slurmstepd: error: *** JOB 813738 ON della-i13n16 CANCELLED AT 2025-09-21T01:18:26 ***
+slurmstepd: error: *** JOB 813727 ON della-r3c2n13 CANCELLED AT 2025-09-21T01:18:26 ***
+slurmstepd: error: *** JOB 813739 ON della-i13n21 CANCELLED AT 2025-09-21T01:18:27 ***
+slurmstepd: error: *** JOB 813740 ON della-i13n23 CANCELLED AT 2025-09-21T01:18:27 ***
+slurmstepd: error: *** JOB 813741 ON della-i13n24 CANCELLED AT 2025-09-21T01:18:28 ***
+slurmstepd: error: *** JOB 813742 ON della-h17n4 CANCELLED AT 2025-09-21T01:18:28 ***
+slurmstepd: error: *** JOB 813743 ON della-h14n3 CANCELLED AT 2025-09-21T01:18:29 ***
+slurmstepd: error: *** JOB 813726 ON della-r3c2n13 CANCELLED AT 2025-09-21T01:18:29 ***
+/var/spool/slurmd/job813841/slurm_script: line 20: 2557077 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813841.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813745 ON della-h14n13 CANCELLED AT 2025-09-21T01:18:30 ***
+/var/spool/slurmd/job813843/slurm_script: line 20: 2557078 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813843.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813716 ON della-r3c2n2 CANCELLED AT 2025-09-21T01:18:30 ***
+/var/spool/slurmd/job813826/slurm_script: line 20: 3014099 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813826.batch. Some of the step tasks have been OOM Killed.
+/var/spool/slurmd/job813860/slurm_script: line 20: 3409360 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813860.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813747 ON della-h14n15 CANCELLED AT 2025-09-21T01:18:31 ***
+slurmstepd: error: *** JOB 813748 ON della-h14n18 CANCELLED AT 2025-09-21T01:18:31 ***
+/var/spool/slurmd/job813857/slurm_script: line 20: 3409352 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813857.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813749 ON della-h14n19 CANCELLED AT 2025-09-21T01:18:32 ***
+slurmstepd: error: *** JOB 813750 ON della-h16n1 CANCELLED AT 2025-09-21T01:18:32 ***
+slurmstepd: error: *** JOB 813751 ON della-h16n4 CANCELLED AT 2025-09-21T01:18:33 ***
+slurmstepd: error: *** JOB 813752 ON della-h16n5 CANCELLED AT 2025-09-21T01:18:33 ***
+Epoch 4/100. Test loss: orig=4.693e-03, cp=5.587e-03
+/var/spool/slurmd/job813831/slurm_script: line 20: 3014103 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813831.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813753 ON della-h16n5 CANCELLED AT 2025-09-21T01:18:34 ***
+slurmstepd: error: *** JOB 813754 ON della-h16n5 CANCELLED AT 2025-09-21T01:18:34 ***
+Epoch 4/100. Test loss: orig=5.680e-03, cp=5.820e-03
+Epoch 2/100. Test loss: orig=4.456e-03, cp=4.613e-03
+slurmstepd: error: *** JOB 813755 ON della-h16n5 CANCELLED AT 2025-09-21T01:18:35 ***
+slurmstepd: error: *** JOB 813756 ON della-h16n9 CANCELLED AT 2025-09-21T01:18:35 ***
+Epoch 3/100. Test loss: orig=4.782e-03, cp=5.061e-03
+slurmstepd: error: *** JOB 813757 ON della-h16n10 CANCELLED AT 2025-09-21T01:18:36 ***
+slurmstepd: error: *** JOB 813717 ON della-r3c2n2 CANCELLED AT 2025-09-21T01:18:36 ***
+Epoch 3/100. Test loss: orig=4.317e-03, cp=4.543e-03
+/var/spool/slurmd/job813859/slurm_script: line 20: 3409353 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813859.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813759 ON della-h16n12 CANCELLED AT 2025-09-21T01:18:37 ***
+slurmstepd: error: *** JOB 813760 ON della-h16n13 CANCELLED AT 2025-09-21T01:18:37 ***
+/var/spool/slurmd/job813827/slurm_script: line 20: 3014101 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813827.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813761 ON della-h16n14 CANCELLED AT 2025-09-21T01:18:38 ***
+Epoch 2/100. Test loss: orig=4.427e-03, cp=4.645e-03
+slurmstepd: error: *** JOB 813762 ON della-h16n16 CANCELLED AT 2025-09-21T01:18:38 ***
+Epoch 3/100. Test loss: orig=4.077e-03, cp=4.321e-03
+slurmstepd: error: *** JOB 813763 ON della-h16n17 CANCELLED AT 2025-09-21T01:18:39 ***
+slurmstepd: error: *** JOB 813764 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:39 ***
+/var/spool/slurmd/job813832/slurm_script: line 20: 3014104 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813832.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813765 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:40 ***
+/var/spool/slurmd/job813834/slurm_script: line 20: 3014109 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813834.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813766 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:40 ***
+/var/spool/slurmd/job813840/slurm_script: line 20: 2557079 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813840.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813767 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:41 ***
+slurmstepd: error: *** JOB 813768 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:41 ***
+slurmstepd: error: *** JOB 813769 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:42 ***
+slurmstepd: error: *** JOB 813770 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:42 ***
+slurmstepd: error: *** JOB 813771 ON della-h17n5 CANCELLED AT 2025-09-21T01:18:43 ***
+slurmstepd: error: *** JOB 813718 ON della-r3c2n3 CANCELLED AT 2025-09-21T01:18:43 ***
+slurmstepd: error: *** JOB 813773 ON della-h17n9 CANCELLED AT 2025-09-21T01:18:44 ***
+slurmstepd: error: *** JOB 813774 ON della-h17n13 CANCELLED AT 2025-09-21T01:18:44 ***
+slurmstepd: error: *** JOB 813775 ON della-h17n13 CANCELLED AT 2025-09-21T01:18:45 ***
+slurmstepd: error: *** JOB 813776 ON della-h17n13 CANCELLED AT 2025-09-21T01:18:45 ***
+slurmstepd: error: *** JOB 813777 ON della-h17n14 CANCELLED AT 2025-09-21T01:18:46 ***
+slurmstepd: error: *** JOB 813778 ON della-h17n14 CANCELLED AT 2025-09-21T01:18:46 ***
+slurmstepd: error: *** JOB 813779 ON della-h17n14 CANCELLED AT 2025-09-21T01:18:47 ***
+slurmstepd: error: *** JOB 813780 ON della-h17n14 CANCELLED AT 2025-09-21T01:18:47 ***
+slurmstepd: error: *** JOB 813781 ON della-h17n14 CANCELLED AT 2025-09-21T01:18:48 ***
+slurmstepd: error: *** JOB 813824 ON della-h17n1 CANCELLED AT 2025-09-21T01:18:48 ***
+slurmstepd: error: *** JOB 813825 ON della-h17n1 CANCELLED AT 2025-09-21T01:18:49 ***
+slurmstepd: error: *** JOB 813758 ON della-h16n11 CANCELLED AT 2025-09-21T01:18:51 ***
+slurmstepd: error: *** JOB 813772 ON della-h17n6 CANCELLED AT 2025-09-21T01:18:53 ***
+Epoch 2/100. Test loss: orig=3.165e-03, cp=3.473e-03
+slurmstepd: error: *** JOB 813842 ON della-h12n15 CANCELLED AT 2025-09-21T01:18:55 ***
+slurmstepd: error: *** JOB 813845 ON della-h12n5 CANCELLED AT 2025-09-21T01:18:57 ***
+slurmstepd: error: *** JOB 813846 ON della-h12n5 CANCELLED AT 2025-09-21T01:18:57 ***
+slurmstepd: error: *** JOB 813847 ON della-h12n5 CANCELLED AT 2025-09-21T01:18:58 ***
+slurmstepd: error: *** JOB 813848 ON della-h12n5 CANCELLED AT 2025-09-21T01:18:58 ***
+slurmstepd: error: *** JOB 813849 ON della-h12n7 CANCELLED AT 2025-09-21T01:18:59 ***
+slurmstepd: error: *** JOB 813844 ON della-h12n15 CANCELLED AT 2025-09-21T01:18:59 ***
+slurmstepd: error: *** JOB 813851 ON della-h12n7 CANCELLED AT 2025-09-21T01:19:00 ***
+/var/spool/slurmd/job813858/slurm_script: line 20: 3409348 Killed                  python width.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=813858.batch. Some of the step tasks have been OOM Killed.
+slurmstepd: error: *** JOB 813853 ON della-h12n7 CANCELLED AT 2025-09-21T01:19:01 ***
+slurmstepd: error: *** JOB 813854 ON della-h12n7 CANCELLED AT 2025-09-21T01:19:01 ***
+slurmstepd: error: *** JOB 813855 ON della-h12n7 CANCELLED AT 2025-09-21T01:19:02 ***
+slurmstepd: error: *** JOB 813856 ON della-h12n7 CANCELLED AT 2025-09-21T01:19:02 ***
+slurmstepd: error: *** JOB 813852 ON della-h12n7 CANCELLED AT 2025-09-21T01:19:03 ***
+slurmstepd: error: *** JOB 813861 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:05 ***
+slurmstepd: error: *** JOB 813850 ON della-h12n7 CANCELLED AT 2025-09-21T01:19:05 ***
+slurmstepd: error: *** JOB 813863 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:06 ***
+slurmstepd: error: *** JOB 813864 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:06 ***
+slurmstepd: error: *** JOB 813865 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:07 ***
+slurmstepd: error: *** JOB 813867 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:08 ***
+slurmstepd: error: *** JOB 813862 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:08 ***
+slurmstepd: error: *** JOB 813869 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:09 ***
+slurmstepd: error: *** JOB 813870 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:09 ***
+slurmstepd: error: *** JOB 813871 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:10 ***
+slurmstepd: error: *** JOB 813866 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:10 ***
+slurmstepd: error: *** JOB 813873 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:11 ***
+slurmstepd: error: *** JOB 813868 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:11 ***
+slurmstepd: error: *** JOB 813875 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:12 ***
+slurmstepd: error: *** JOB 813874 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:12 ***
+slurmstepd: error: *** JOB 813877 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:13 ***
+slurmstepd: error: *** JOB 813872 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:13 ***
+slurmstepd: error: *** JOB 813879 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:14 ***
+slurmstepd: error: *** JOB 813880 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:14 ***
+slurmstepd: error: *** JOB 813881 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:15 ***
+slurmstepd: error: *** JOB 813876 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:15 ***
+slurmstepd: error: *** JOB 813883 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:16 ***
+slurmstepd: error: *** JOB 813878 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:16 ***
+slurmstepd: error: *** JOB 813885 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:17 ***
+slurmstepd: error: *** JOB 813884 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:17 ***
+Epoch 4/100. Test loss: orig=5.210e-03, cp=5.419e-03
+slurmstepd: error: *** JOB 813887 ON della-h12n3 CANCELLED AT 2025-09-21T01:19:18 ***
+slurmstepd: error: *** JOB 813886 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:18 ***
+slurmstepd: error: *** JOB 813890 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:19 ***
+slurmstepd: error: *** JOB 813889 ON della-h12n9 CANCELLED AT 2025-09-21T01:19:19 ***
+slurmstepd: error: *** JOB 813926 ON della-h14n12 CANCELLED AT 2025-09-21T01:19:20 ***
+slurmstepd: error: *** JOB 813925 ON della-h14n12 CANCELLED AT 2025-09-21T01:19:20 ***
+slurmstepd: error: *** JOB 813928 ON della-h16n2 CANCELLED AT 2025-09-21T01:19:21 ***
+slurmstepd: error: *** JOB 813882 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:21 ***
+slurmstepd: error: *** JOB 813930 ON della-h16n7 CANCELLED AT 2025-09-21T01:19:22 ***
+slurmstepd: error: *** JOB 813931 ON della-h16n8 CANCELLED AT 2025-09-21T01:19:22 ***
+slurmstepd: error: *** JOB 813932 ON della-h16n8 CANCELLED AT 2025-09-21T01:19:23 ***
+slurmstepd: error: *** JOB 813933 ON della-h16n10 CANCELLED AT 2025-09-21T01:19:23 ***
+slurmstepd: error: *** JOB 813936 ON della-r3c4n9 CANCELLED AT 2025-09-21T01:19:24 ***
+slurmstepd: error: *** JOB 813929 ON della-h16n2 CANCELLED AT 2025-09-21T01:19:24 ***
+slurmstepd: error: *** JOB 813938 ON della-r3c4n13 CANCELLED AT 2025-09-21T01:19:25 ***
+slurmstepd: error: *** JOB 813937 ON della-r3c4n9 CANCELLED AT 2025-09-21T01:19:25 ***
+slurmstepd: error: *** JOB 813967 ON della-i13n14 CANCELLED AT 2025-09-21T01:19:26 ***
+slurmstepd: error: *** JOB 813927 ON della-h16n7 CANCELLED AT 2025-09-21T01:19:26 ***
+slurmstepd: error: *** JOB 813973 ON della-h14n5 CANCELLED AT 2025-09-21T01:19:27 ***
+slurmstepd: error: *** JOB 813974 ON della-h14n5 CANCELLED AT 2025-09-21T01:19:27 ***
+slurmstepd: error: *** JOB 813975 ON della-h14n7 CANCELLED AT 2025-09-21T01:19:28 ***
+slurmstepd: error: *** JOB 813976 ON della-h14n7 CANCELLED AT 2025-09-21T01:19:28 ***
+slurmstepd: error: *** JOB 813977 ON della-h16n10 CANCELLED AT 2025-09-21T01:19:29 ***
+slurmstepd: error: *** JOB 813968 ON della-i13n14 CANCELLED AT 2025-09-21T01:19:29 ***
+slurmstepd: error: *** JOB 813979 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:30 ***
+slurmstepd: error: *** JOB 813978 ON della-h17n17 CANCELLED AT 2025-09-21T01:19:30 ***
+slurmstepd: error: *** JOB 813981 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:31 ***
+slurmstepd: error: *** JOB 813966 ON della-r3c4n13 CANCELLED AT 2025-09-21T01:19:31 ***
+slurmstepd: error: *** JOB 813983 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:32 ***
+slurmstepd: error: *** JOB 813984 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:32 ***
+slurmstepd: error: *** JOB 813985 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:33 ***
+slurmstepd: error: *** JOB 813986 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:33 ***
+slurmstepd: error: *** JOB 813987 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:34 ***
+slurmstepd: error: *** JOB 813982 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:34 ***
+slurmstepd: error: *** JOB 813989 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:35 ***
+slurmstepd: error: *** JOB 813988 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:35 ***
+slurmstepd: error: *** JOB 813991 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:36 ***
+slurmstepd: error: *** JOB 813980 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:36 ***
+slurmstepd: error: *** JOB 813993 ON della-h17n22 CANCELLED AT 2025-09-21T01:19:37 ***
+slurmstepd: error: *** JOB 813994 ON della-h17n22 CANCELLED AT 2025-09-21T01:19:37 ***
+slurmstepd: error: *** JOB 813995 ON della-h17n22 CANCELLED AT 2025-09-21T01:19:38 ***
+slurmstepd: error: *** JOB 813996 ON della-h17n22 CANCELLED AT 2025-09-21T01:19:38 ***
+slurmstepd: error: *** JOB 813997 ON della-h17n22 CANCELLED AT 2025-09-21T01:19:39 ***
+slurmstepd: error: *** JOB 813992 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:39 ***
+Epoch 2/100. Test loss: orig=5.101e-03, cp=5.262e-03
+slurmstepd: error: *** JOB 813999 ON della-h17n22 CANCELLED AT 2025-09-21T01:19:40 ***
+slurmstepd: error: *** JOB 814000 ON della-h17n1 CANCELLED AT 2025-09-21T01:19:40 ***
+slurmstepd: error: *** JOB 814001 ON della-h17n1 CANCELLED AT 2025-09-21T01:19:41 ***
+slurmstepd: error: *** JOB 813990 ON della-h17n21 CANCELLED AT 2025-09-21T01:19:41 ***
+slurmstepd: error: *** JOB 814003 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:42 ***
+slurmstepd: error: *** JOB 814004 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:42 ***
+slurmstepd: error: *** JOB 814005 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:43 ***
+slurmstepd: error: *** JOB 814006 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:43 ***
+slurmstepd: error: *** JOB 814007 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:44 ***
+slurmstepd: error: *** JOB 814008 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:44 ***
+slurmstepd: error: *** JOB 814009 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:45 ***
+slurmstepd: error: *** JOB 813998 ON della-h17n22 CANCELLED AT 2025-09-21T01:19:45 ***
+slurmstepd: error: *** JOB 814011 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:46 ***
+slurmstepd: error: *** JOB 814010 ON della-h12n8 CANCELLED AT 2025-09-21T01:19:46 ***
+slurmstepd: error: *** JOB 814013 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:47 ***
+slurmstepd: error: *** JOB 814002 ON della-h12n5 CANCELLED AT 2025-09-21T01:19:47 ***
+slurmstepd: error: *** JOB 813746 ON della-h14n14 CANCELLED AT 2025-09-21T01:19:48 ***
+slurmstepd: error: *** JOB 814012 ON della-h12n1 CANCELLED AT 2025-09-21T01:19:49 ***
+slurmstepd: error: *** JOB 813728 ON della-r3c2n15 CANCELLED AT 2025-09-21T01:19:51 ***
+slurmstepd: error: *** JOB 813735 ON della-i13n15 CANCELLED AT 2025-09-21T01:19:55 ***
+slurmstepd: error: *** JOB 813736 ON della-i13n16 CANCELLED AT 2025-09-21T01:19:55 ***
+slurmstepd: error: *** JOB 813737 ON della-i13n16 CANCELLED AT 2025-09-21T01:19:56 ***
+slurmstepd: error: *** JOB 813744 ON della-h14n9 CANCELLED AT 2025-09-21T01:20:00 ***
