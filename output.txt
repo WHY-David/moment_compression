@@ -1,14 +1,51 @@
-Epoch 780/2000. Test loss: orig=3.455e-03, cp=3.427e-03
-Epoch 730/2000. Test loss: orig=3.113e-03, cp=3.162e-03
-Epoch 1680/2000. Test loss: orig=8.326e-04, cp=9.403e-04
-Epoch 1920/2000. Test loss: orig=7.051e-04, cp=7.717e-04
-Epoch 830/2000. Test loss: orig=3.939e-03, cp=3.920e-03
-Epoch 950/2000. Test loss: orig=5.324e-03, cp=5.471e-03
-/var/spool/slurmd/job841249/slurm_script: line 20: 3247173 Killed                  python width.py
-slurmstepd: error: Detected 1 oom_kill event in StepId=841249.batch. Some of the step tasks have been OOM Killed.
-/var/spool/slurmd/job841248/slurm_script: line 20: 164015 Killed                  python width.py
-slurmstepd: error: Detected 1 oom_kill event in StepId=841248.batch. Some of the step tasks have been OOM Killed.
-Epoch 1890/2000. Test loss: orig=7.126e-04, cp=8.277e-04
-Epoch 1910/2000. Test loss: orig=6.580e-04, cp=7.522e-04
-/var/spool/slurmd/job841247/slurm_script: line 20: 164014 Killed                  python width.py
-slurmstepd: error: Detected 1 oom_kill event in StepId=841247.batch. Some of the step tasks have been OOM Killed.
+SLURM_ARRAY_TASK_ID=389 -> seed=9, d=524288
+joblib.externals.loky.process_executor._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/_utils.py", line 72, in __call__
+    return self.func(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/parallel.py", line 607, in __call__
+    return [func(*args, **kwargs) for func, args, kwargs in self.items]
+            ^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/gpfs/hw2872/moment_compression/compressor.py", line 192, in _reduce_compute
+    z = find_null_vec(AS, self.rng, tol=self.tol)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/gpfs/hw2872/moment_compression/compressor.py", line 67, in find_null_vec
+    _, _, Vh = np.linalg.svd(A, full_matrices=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/numpy/linalg/linalg.py", line 1681, in svd
+    u, s, vh = gufunc(a, signature=signature, extobj=extobj)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/numpy/linalg/linalg.py", line 121, in _raise_linalgerror_svd_nonconvergence
+    raise LinAlgError("SVD did not converge")
+numpy.linalg.LinAlgError: SVD did not converge
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/scratch/gpfs/hw2872/moment_compression/scaling_law/trainds.py", line 181, in <module>
+    test_loss, test_loss_cp = main(d, seed)
+                              ^^^^^^^^^^^^^
+  File "/scratch/gpfs/hw2872/moment_compression/scaling_law/trainds.py", line 138, in main
+    c_, train_cp = cp.compress(k, dstop=dstop(d), print_progress=False)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/gpfs/hw2872/moment_compression/compressor.py", line 245, in compress
+    results = Parallel(n_jobs=-1, prefer='threads')(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/parallel.py", line 2072, in __call__
+    return output if self.return_generator else list(output)
+                                                ^^^^^^^^^^^^
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/parallel.py", line 1682, in _get_outputs
+    yield from self._retrieve()
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/parallel.py", line 1784, in _retrieve
+    self._raise_error_fast()
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/parallel.py", line 1859, in _raise_error_fast
+    error_job.get_result(self.timeout)
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/parallel.py", line 758, in get_result
+    return self._return_or_raise()
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hw2872/.conda/envs/torch-env/lib/python3.12/site-packages/joblib/parallel.py", line 773, in _return_or_raise
+    raise self._result
+numpy.linalg.LinAlgError: SVD did not converge

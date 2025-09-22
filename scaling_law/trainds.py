@@ -38,7 +38,7 @@ def make_loader(data, num_samples=None, batch_size=None, weights=None):
         sampler = torch.utils.data.WeightedRandomSampler(weights, num_samples=num_samples, replacement=True)
     return DataLoader(ds, batch_size=batch_size, sampler=sampler)
 
-def make_test_loader(data, batch_size=4096):
+def make_test_loader(data, batch_size=2048):
     if isinstance(data, np.ndarray):
         data = torch.from_numpy(data)
     X = data[:, :2].float().to(device)
@@ -176,14 +176,14 @@ if __name__ == "__main__":
             ])
         
         # evaluate and write data rows
-        for d in dlist:
-            for seed in seedlist:
-                test_loss, test_loss_cp = main(d, seed)
-                writer.writerow([
-                    seed,
-                    d,
-                    int(16*np.sqrt(d)),
-                    test_loss,
-                    test_loss_cp
-                ])
-                print(f"seed={seed}, d={d} done.")
+        # for d in dlist:
+        #     for seed in seedlist:
+        test_loss, test_loss_cp = main(d, seed)
+        writer.writerow([
+            seed,
+            d,
+            int(16*np.sqrt(d)),
+            test_loss,
+            test_loss_cp
+        ])
+        print(f"seed={seed}, d={d} done.")

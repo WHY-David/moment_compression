@@ -22,15 +22,15 @@ else:
     device = torch.device("cpu")
 
 
-def make_loader(dataset, batch_size=64, seed=0):
-    """Deterministic DataLoader using a fixed shuffled index order."""
-    n = len(dataset)
-    rng = np.random.default_rng(seed)
-    indices = np.arange(n)
-    rng.shuffle(indices)
-    sampler = torch.utils.data.SubsetRandomSampler(indices.tolist())
-    loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler, drop_last=False)
-    return loader
+# def make_loader(dataset, batch_size=64, seed=0):
+#     """Deterministic DataLoader using a fixed shuffled index order."""
+#     n = len(dataset)
+#     rng = np.random.default_rng(seed)
+#     indices = np.arange(n)
+#     rng.shuffle(indices)
+#     sampler = torch.utils.data.SubsetRandomSampler(indices.tolist())
+#     loader = DataLoader(dataset, batch_size=batch_size, sampler=sampler, drop_last=False)
+#     return loader
 
 def compute_loss(net, loader, loss_fn=nn.MSELoss()):
     """
@@ -68,7 +68,7 @@ def train_pair(net_orig: nn.Module,
     """Train original and compressed networks side-by-side using shared minibatches."""
     # set_training_seed(seed)
     train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=4)
-    test_loader = DataLoader(test_ds, batch_size=len(test_ds))
+    test_loader = DataLoader(test_ds, batch_size=2048)
     loss_fn = nn.MSELoss()
 
     opt_orig = algo(net_orig.parameters(), **opt_params)
