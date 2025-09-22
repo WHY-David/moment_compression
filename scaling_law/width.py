@@ -90,6 +90,7 @@ def train_pair(net_orig: nn.Module,
         net_cp.fc1.bias.register_hook(lambda grad: grad * inv_c)
         net_cp.fc2.weight.register_hook(lambda grad: grad * inv_c.view(1, -1))
 
+    epoch_range = [0]
     test_losses_orig = [compute_loss(net_orig, test_loader, loss_fn)]
     test_losses_cp = [compute_loss(net_cp, test_loader, loss_fn)]
 
@@ -123,13 +124,15 @@ def train_pair(net_orig: nn.Module,
         sched_orig.step()
         sched_cp.step()
 
-        tel_orig = compute_loss(net_orig, test_loader, loss_fn)
-        tel_cp = compute_loss(net_cp, test_loader, loss_fn)
-        test_losses_orig.append(tel_orig)
-        test_losses_cp.append(tel_cp)
-        print(f"Epoch {epoch}/{epochs}. Test loss: orig={tel_orig:.3e}, cp={tel_cp:.3e}")
+        if epoch % 10 == 0 or epoch == epochs:
+            epoch_range.append(epoch)
+            tel_orig = compute_loss(net_orig, test_loader, loss_fn)
+            tel_cp = compute_loss(net_cp, test_loader, loss_fn)
+            test_losses_orig.append(tel_orig)
+            test_losses_cp.append(tel_cp)
+            print(f"Epoch {epoch}/{epochs}. Test loss: orig={tel_orig:.3e}, cp={tel_cp:.3e}")
 
-    return test_losses_orig, test_losses_cp
+    return epoch_range, test_losses_orig, test_losses_cp
     
 
 
@@ -148,11 +151,11 @@ if __name__ == '__main__':
     # Hyperparameters
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
-    train_size = 10**7
+    train_size = 10**6
     test_size = 10**5
     train_noise = 0.2
     tol = 1e-12
-    epochs = 200
+    epochs = 2000
     batch_size = 512
 
     # AdamW
@@ -175,7 +178,7 @@ if __name__ == '__main__':
     print(f'Compression completed. d={d} -> dstop={dstop(d)}')
 
     # Train all cases with identical minibatches/order — sequential execution
-    test_loss, test_loss_cp = train_pair(
+    epoch_range, test_loss, test_loss_cp = train_pair(
         net_orig,
         net_cp,
         train_ds,
@@ -187,10 +190,11 @@ if __name__ == '__main__':
         lr=lr,
     )
 
-    epoch_range = list(range(0, epochs+1))
+    # save
+    foldername = f'LTH_{task_name}_{algo_name}_k{k}_trains{train_size}_noise{train_noise}_bs{batch_size}_lr{lr}'
+    filename = foldername + f'/d{d}_dstop{dstop(d)}_seed{seed}'
+    os.makedirs(foldername, exist_ok=True)
 
-    os.makedirs(f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}', exist_ok=True)
-    filename = f'LTH_{task_name}_{algo_name}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}/d{d}_dstop{dstop(d)}_seed{seed}'
     if save_csv:
         with open(filename + '.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)

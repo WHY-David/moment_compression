@@ -3,9 +3,9 @@
 #SBATCH --output=output.txt  # output file name, %A is job ID and %a is array index
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=1G         # memory per cpu-core (4G is default)
-#SBATCH --array=160-439
+#SBATCH --cpus-per-task=8
+#SBATCH --mem-per-cpu=10G         # memory per cpu-core (4G is default)
+#SBATCH --array=320-379
 #SBATCH --time=23:59:00          # total run time limit (HH:MM:SS)
 #SBATCH --mail-type=all
 #SBATCH --mail-user=hywang@princeton.edu

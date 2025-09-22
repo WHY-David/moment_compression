@@ -203,9 +203,9 @@ if __name__ == '__main__':
     train_loss_cp,   test_loss_cp   = bptrain(net_cp,   train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
     train_loss_naive, test_loss_naive = bptrain(net_naive, train_ds, test_ds, epochs=epochs, batch_size=batch_size, seed=seed, algo=algo, lr=lr)
 
+    os.makedirs('LTH', exist_ok=True)
     filename = f'LTH/harm_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_bs{batch_size}_lr{lr}'
     if save_csv:
-        os.makedirs('LTH', exist_ok=True)
         with open(filename + '.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             # Write header
@@ -230,7 +230,6 @@ if __name__ == '__main__':
                     test_loss_naive[i]
                 ])
     if save_pdf:
-        os.makedirs('LTH', exist_ok=True)
         fig, axs = make_canvas(rows=2, cols=1, axes_width_pt=300)
 
         # Plot Train Loss vs. epoch
