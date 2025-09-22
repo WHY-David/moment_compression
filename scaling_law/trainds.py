@@ -151,10 +151,15 @@ def main(d, seed):
 
 
 if __name__ == "__main__":
-    seedlist = list(range(20))
-    dlist = [2**n for n in range(17, 20)]
+    # seedlist = list(range(20))
+    # dlist = [2**n for n in range(17, 20)]
+    sid = int(os.environ["SLURM_ARRAY_TASK_ID"])
+    seed = sid % 20
+    log2d = sid // 20
+    d = 2**log2d
+    print(f'SLURM_ARRAY_TASK_ID={sid} -> seed={seed}, d={d}')
 
-    csv_path = 'trainds_scaling.csv'
+    csv_path = 'trainds_scaling_temp.csv'
     file_exists = os.path.exists(csv_path)
     write_header = (not file_exists) or os.path.getsize(csv_path) == 0
 
