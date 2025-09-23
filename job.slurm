@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=width           # create a short name for your job
+#SBATCH --job-name=widthc           # create a short name for your job
 #SBATCH --output=output.txt  # output file name, %A is job ID and %a is array index
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem-per-cpu=8G         # memory per cpu-core (4G is default)
-#SBATCH --array=260-419
+#SBATCH --cpus-per-task=4
+#SBATCH --mem-per-cpu=7G         # memory per cpu-core (4G is default)
+#SBATCH --array=200-219
 #SBATCH --time=23:59:00          # total run time limit (HH:MM:SS)
 #SBATCH --mail-type=all
 #SBATCH --mail-user=hywang@princeton.edu

@@ -3,7 +3,7 @@ import random
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-# from torch.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from matplotlib import pyplot as plt
 plt.rc('font', family='Helvetica', size=8)
 import csv
@@ -19,6 +19,7 @@ if torch.cuda.is_available():
     torch.backends.cuda.matmul.allow_tf32 = True
     device = torch.device('cuda')
 else:
+    # print('CUDA not available, using CPU')
     device = torch.device("cpu")
 
 
@@ -67,8 +68,12 @@ def train_pair(net_orig: nn.Module,
                **opt_params):
     """Train original and compressed networks side-by-side using shared minibatches."""
     # set_training_seed(seed)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=4)
-    test_loader = DataLoader(test_ds, batch_size=2048)
+    if device.type == 'cuda':
+        train_loader = DataLoader(train_ds, batch_size=batch_size, pin_memory=True)
+        test_loader = DataLoader(test_ds, batch_size=1024, pin_memory=True)
+    else:
+        train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=4)
+        test_loader = DataLoader(test_ds, batch_size=1024)
     loss_fn = nn.MSELoss()
 
     opt_orig = algo(net_orig.parameters(), **opt_params)
@@ -77,7 +82,7 @@ def train_pair(net_orig: nn.Module,
     sched_cp = torch.optim.lr_scheduler.CosineAnnealingLR(opt_cp, T_max=epochs, eta_min=0.)
 
     use_amp = device.type == 'cuda'
-    # scaler = GradScaler(device.type, enabled=use_amp)
+    scaler = GradScaler(device.type, enabled=use_amp)
 
     if isinstance(net_cp, WeightedTwoLayerNet):
         weights_t = net_cp.weights
@@ -124,7 +129,7 @@ def train_pair(net_orig: nn.Module,
         sched_orig.step()
         sched_cp.step()
 
-        if epoch % 10 == 0 or epoch == epochs:
+        if epoch % 20 == 0 or epoch == epochs:
             epoch_range.append(epoch)
             tel_orig = compute_loss(net_orig, test_loader, loss_fn)
             tel_cp = compute_loss(net_cp, test_loader, loss_fn)
@@ -138,25 +143,27 @@ def train_pair(net_orig: nn.Module,
 
 if __name__ == '__main__':
     save_csv = True
-    save_pdf = True
+    save_pdf = False
 
     # seed = 42
-    # dlist = [2**n for n in range(8,10)]
+    # dlist = 16384
     sid = int(os.environ["SLURM_ARRAY_TASK_ID"])
-    seed = sid % 20
-    log2d = sid // 20
+    seed = sid % 10
+    log2d = sid // 10
     d = 2**log2d
     print(f'SLURM_ARRAY_TASK_ID={sid} -> seed={seed}, d={d}')
 
     # Hyperparameters
     dstop = lambda d: int(16*np.sqrt(d))
     k = 6
-    train_size = 10**6
-    test_size = 10**5
+    train_size = 20000
+    test_size = 20000
+    # train_size = 10**4
+    # test_size = 10**4
     train_noise = 0.2
     tol = 1e-12
     epochs = 2000
-    batch_size = 512
+    batch_size = 128
 
     # AdamW
     algo_name = 'AdamW'
@@ -167,10 +174,10 @@ if __name__ == '__main__':
     # net_truth = TwoLayerNet(input_dim=2, hidden_dim=1000, init_uniform=None, activation=nn.ReLU).to(device)
     f = lambda x, y: cyl_harmonic(x, y, n=6, k=20)
 
-    train_data = generate_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True, device=device)
+    train_data = generate_data(train_size, f=f, noise=train_noise, seed=seed**2, return_tensor=True)
     train_ds = TensorDataset(train_data[:, :2], train_data[:, 2:])
 
-    test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True, device=device)
+    test_data = generate_data(test_size, f=f, noise=0., seed=seed**3, return_tensor=True)
     test_ds = TensorDataset(test_data[:, :2], test_data[:, 2:])
 
     net_orig = TwoLayerNet(input_dim=2, hidden_dim=d, init_uniform=None, activation=nn.ReLU).to(device)
@@ -191,7 +198,7 @@ if __name__ == '__main__':
     )
 
     # save
-    foldername = f'LTH_{task_name}_{algo_name}_k{k}_trains{train_size}_noise{train_noise}_bs{batch_size}_lr{lr}'
+    foldername = f'CPU_{task_name}_{algo_name}_k{k}_trains{train_size}_noise{train_noise}_bs{batch_size}_lr{lr}_epoch{epochs}'
     filename = foldername + f'/d{d}_dstop{dstop(d)}_seed{seed}'
     os.makedirs(foldername, exist_ok=True)
 
@@ -201,8 +208,8 @@ if __name__ == '__main__':
             # Write header
             writer.writerow(['d', 'test_loss_orig', 'test_loss_cp'])
             # Write one row per width with final-epoch test losses
-            for n in epoch_range:
-                writer.writerow([n, test_loss[n], test_loss_cp[n]])
+            for n in range(len(epoch_range)):
+                writer.writerow([epoch_range[n], test_loss[n], test_loss_cp[n]])
     if save_pdf and seed == 0:
         fig, axs = make_canvas(rows=1, cols=1, axes_width_pt=200)
 
