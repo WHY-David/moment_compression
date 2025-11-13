@@ -93,5 +93,5 @@ def demo_3d(d=500, k=2, seed=0, **kwargs):
 
 if __name__ == "__main__":
     # run demo with default parameters
-    demo_3d(d=1000000, k=3, dstop=10000, print_progress=True)
-    # demo_3d(d=1000, k=2, seed=0)
+    # demo_3d(d=1000000, k=3, dstop=10000, print_progress=True)
+    demo_3d(d=1000, dstop=40, k=2, seed=0)
