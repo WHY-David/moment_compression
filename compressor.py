@@ -232,7 +232,7 @@ class Compressor:
             # choose kmeans or greedy automatically
             if method == 'kmeans':
                 n_clusters = int(min(0.98*self.alive.size / Nmk, 100*dstop/Nmk))
-                mbk = MiniBatchKMeans(n_clusters=n_clusters, max_iter=200, batch_size=4096, random_state=0)
+                mbk = MiniBatchKMeans(n_clusters=n_clusters, max_iter=200, batch_size=2048, random_state=0)
                 labels = mbk.fit_predict(self.w_[self.alive], sample_weight=self.c_[self.alive])
                 # indices within mask
                 clusters = [np.where(labels==j)[0].tolist() for j in range(n_clusters)]
