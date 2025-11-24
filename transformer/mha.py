@@ -1,24 +1,31 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import matplotlib.pyplot as plt
+# import torch.optim as optim
+# import matplotlib.pyplot as plt
+import math
+
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from compressor import Compressor
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, d_heads: int):
+    def __init__(self, d_model: int, d_heads: int, d_in: int, d_out: int):
         super().__init__()
         assert d_model % d_heads == 0, "d_model must be divisible by d_heads"
         self.d_model = d_model
         self.d_heads = d_heads
+        self.d_in = d_in
+        self.d_out = d_out
         self.d_head = d_model // d_heads
 
         # Linear layers for Q, K, V
-        self.W_q = nn.Linear(d_model, d_model)
-        self.W_k = nn.Linear(d_model, d_model)
-        self.W_v = nn.Linear(d_model, d_model)
+        self.W_q = nn.Linear(d_in, d_model, bias=False)
+        self.W_k = nn.Linear(d_in, d_model, bias=False)
+        self.W_v = nn.Linear(d_in, d_model, bias=False)
 
         # Output projection
-        self.W_o = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_out, bias=False)
 
     def _split_heads(self, x):
         # x: (B, T, d_model) -> (B, d_heads, T, d_head)
@@ -33,7 +40,7 @@ class MultiHeadAttention(nn.Module):
         return x.view(B, T, H * Dh)
 
     def forward(self, x, mask=None):
-        # x: (B, T, d_model)
+        # x: (B, T, d_in)
         Q = self._split_heads(self.W_q(x))
         K = self._split_heads(self.W_k(x))
         V = self._split_heads(self.W_v(x))
@@ -56,21 +63,23 @@ class MultiHeadAttention(nn.Module):
     
 
 class MultiHeadAttentionW(nn.Module):
-    def __init__(self, d_model: int, d_heads: int, weights=None):
+    def __init__(self, d_model: int, d_heads: int, d_in: int, d_out: int, weights=None):
         super().__init__()
         assert d_model % d_heads == 0, "d_model must be divisible by d_heads"
 
         self.d_model = d_model
         self.d_heads = d_heads
+        self.d_in = d_in
+        self.d_out = d_out
         self.d_head = d_model // d_heads
 
         # Linear layers for Q, K, V
-        self.W_q = nn.Linear(d_model, d_model)
-        self.W_k = nn.Linear(d_model, d_model)
-        self.W_v = nn.Linear(d_model, d_model)
+        self.W_q = nn.Linear(d_in, d_model, bias=False)
+        self.W_k = nn.Linear(d_in, d_model, bias=False)
+        self.W_v = nn.Linear(d_in, d_model, bias=False)
 
         # Output projection
-        self.W_o = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_out, bias=False)
 
         # Per-head weights (non-trainable buffer)
         if weights is None:
@@ -99,7 +108,7 @@ class MultiHeadAttentionW(nn.Module):
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         """
-        x: (B, T, d_model)
+        x: (B, T, d_in)
         mask: optional, shape (B, 1, 1, T) or (B, 1, T, T), with 1/True = keep, 0/False = mask
         """
         # Project to Q, K, V
@@ -133,28 +142,34 @@ def extract(mha: MultiHeadAttention):
 
     Each row corresponds to one head h and is
 
-        [ vec(W_q^{(h)}), vec(W_k^{(h)}), vec(W_v^{(h)}) ],
+        [ vec(W_q^{(h)}), vec(W_k^{(h)}), vec(W_v^{(h)}), vec(W_o^{(h)}) ],
 
-    where W_*^{(h)} is the (d_head, d_model) row-block of that head.
-    So w_.shape = (d_heads, 3 * d_head * d_model).
+    where W_*^{(h)} is the (d_head, d_in) row-block of that head for Q/K/V,
+    and W_o^{(h)} is the (d_out, d_head) column-block of that head.
+    So w_.shape = (d_heads, 3 * d_head * d_in + d_out * d_head).
     """
     with torch.no_grad():
         d_model = mha.d_model
         d_heads = mha.d_heads
+        d_in = mha.d_in
+        d_out = mha.d_out
         d_head = mha.d_head
 
-        # Each is (out_features=d_model, in_features=d_model)
-        Wq = mha.W_q.weight.data.cpu().numpy()  # (d_model, d_model)
+        # Each is (out_features=d_model, in_features=d_in)
+        Wq = mha.W_q.weight.data.cpu().numpy()  # (d_model, d_in)
         Wk = mha.W_k.weight.data.cpu().numpy()
         Wv = mha.W_v.weight.data.cpu().numpy()
+        Wo = mha.W_o.weight.data.cpu().numpy()
 
-        assert Wq.shape == (d_model, d_model)
-        assert Wk.shape == (d_model, d_model)
-        assert Wv.shape == (d_model, d_model)
+        assert Wq.shape == (d_model, d_in)
+        assert Wk.shape == (d_model, d_in)
+        assert Wv.shape == (d_model, d_in)
+        assert Wo.shape == (d_out, d_model)
         assert d_model == d_heads * d_head, "d_model must be d_heads * d_head"
 
-        num_params_mat = d_head * d_model         # per (Q or K or V) matrix
-        num_params_head = 3 * num_params_mat      # Q + K + V
+        num_params_qkv = d_head * d_in
+        num_params_wo = d_out * d_head
+        num_params_head = 3 * num_params_qkv + num_params_wo
 
         rows = []
         for h in range(d_heads):
@@ -162,15 +177,17 @@ def extract(mha: MultiHeadAttention):
             e = (h + 1) * d_head
 
             # rows s:e correspond to head h
-            Wq_h = Wq[s:e, :]     # (d_head, d_model)
+            Wq_h = Wq[s:e, :]     # (d_head, d_in)
             Wk_h = Wk[s:e, :]
             Wv_h = Wv[s:e, :]
+            Wo_h = Wo[:, s:e]     # (d_out, d_head)
 
             row = np.concatenate(
                 [
                     Wq_h.reshape(-1),
                     Wk_h.reshape(-1),
                     Wv_h.reshape(-1),
+                    Wo_h.reshape(-1),
                 ],
                 axis=0,
             )
@@ -193,74 +210,73 @@ def compress_mha(
 
     Steps:
     1. Use `extract` to get a row-per-head matrix w_ of shape
-           (d_heads_orig, 3 * d_head_orig * d_model).
+           (d_heads_orig, 3 * d_head_orig * d_in + d_out * d_head_orig).
     2. Run `Compressor` on rows = heads to get:
            weights (length dstop),
-           w_cp   (dstop, 3 * d_head_orig * d_model).
+           w_cp   (dstop, 3 * d_head_orig * d_in + d_out * d_head_orig).
     3. Build a new MultiHeadAttentionW with d_heads = dstop.
-    4. Map each compressed row back to Q/K/V blocks for the new heads.
+    4. Map each compressed row back to Q/K/V and W_o blocks for the new heads.
 
     Because d_head changes when we change d_heads, we adapt the row length
-    by cropping or zero-padding so it matches 3 * d_head_new * d_model.
+    by cropping or zero-padding so it matches 3 * d_head_new * d_in + d_out * d_head_new.
     """
     device = mha.W_q.weight.device
 
     # 1) Extract original per-head parameter rows
     w_orig = extract(mha)              # (d_heads_orig, num_params_head_orig)
-    d_heads_orig = w_orig.shape[0]
+    # d_heads_orig = w_orig.shape[0]
+    # print(w_orig.shape)
 
     # 2) Compress across heads
     cp = Compressor(w_orig, tol=tol)
     weights, w_cp = cp.compress(k, dstop=dstop, print_progress=print_progress)
     # w_cp: (dstop, num_params_head_orig)
 
-    d_model = mha.d_model
-    assert d_model % dstop == 0, "dstop must divide d_model to define heads"
-    d_head_new = d_model // dstop
+    d_in = mha.d_in
+    d_out = mha.d_out
+    d_head = mha.d_head
     d_heads_new = dstop
+    d_model_new = dstop*d_head
 
-    # Original per-head param length
-    num_params_head_orig = w_cp.shape[1]
-    # Target per-head param length for new heads
-    num_params_mat_new = d_head_new * d_model
-    num_params_head_new = 3 * num_params_mat_new
+    num_params_head = w_orig.shape[1]
 
     # 3) Build compressed weighted MHA
     mha_cp = MultiHeadAttentionW(
-        d_model=d_model,
+        d_model=d_model_new,
         d_heads=d_heads_new,
+        d_in=d_in,
         weights=weights,
+        d_out=d_out,
     ).to(device)
 
-    # 4) Reconstruct W_q, W_k, W_v for the compressed heads
-    Wq_new = np.zeros((d_heads_new * d_head_new, d_model), dtype=np.float32)
+    # 4) Reconstruct W_q, W_k, W_v, W_o for the compressed heads
+    Wq_new = np.zeros((d_model_new, d_in), dtype=np.float32)
     Wk_new = np.zeros_like(Wq_new)
     Wv_new = np.zeros_like(Wq_new)
+    Wo_new = np.zeros((d_out, d_model_new), dtype=np.float32)
 
     for h_new in range(d_heads_new):
-        row = w_cp[h_new]  # (num_params_head_orig,)
+        row = w_cp[h_new]  # (num_params_head,)
 
         # Shape-adapt the row if d_head changed:
-        if num_params_head_orig >= num_params_head_new:
-            row_use = row[:num_params_head_new]
-        else:
-            row_use = np.zeros(num_params_head_new, dtype=row.dtype)
-            row_use[:num_params_head_orig] = row
+        assert len(row) == num_params_head
 
-        # Split into Q / K / V for the new head size
-        q_flat = row_use[0:num_params_mat_new]
-        k_flat = row_use[num_params_mat_new:2 * num_params_mat_new]
-        v_flat = row_use[2 * num_params_mat_new:3 * num_params_mat_new]
+        q_flat = row[0:d_head*d_in]
+        k_flat = row[d_head*d_in: 2 * d_head*d_in]
+        v_flat = row[2 * d_head*d_in: 3 * d_head*d_in]
+        o_flat = row[3 * d_head*d_in: ]
 
-        Wq_h = q_flat.reshape(d_head_new, d_model)
-        Wk_h = k_flat.reshape(d_head_new, d_model)
-        Wv_h = v_flat.reshape(d_head_new, d_model)
+        Wq_h = q_flat.reshape(d_head, d_in)
+        Wk_h = k_flat.reshape(d_head, d_in)
+        Wv_h = v_flat.reshape(d_head, d_in)
+        Wo_h = o_flat.reshape(d_out, d_head)
 
-        s = h_new * d_head_new
-        e = (h_new + 1) * d_head_new
+        s = h_new * d_head
+        e = (h_new + 1) * d_head
         Wq_new[s:e, :] = Wq_h
         Wk_new[s:e, :] = Wk_h
         Wv_new[s:e, :] = Wv_h
+        Wo_new[:, s:e] = Wo_h
 
     with torch.no_grad():
         # Copy compressed Q/K/V
@@ -268,18 +284,13 @@ def compress_mha(
         mha_cp.W_k.weight.copy_(torch.from_numpy(Wk_new).to(device))
         mha_cp.W_v.weight.copy_(torch.from_numpy(Wv_new).to(device))
 
-        # Copy biases if they exist
-        if mha_cp.W_q.bias is not None and mha.W_q.bias is not None:
-            mha_cp.W_q.bias.copy_(mha.W_q.bias.data)
-        if mha_cp.W_k.bias is not None and mha.W_k.bias is not None:
-            mha_cp.W_k.bias.copy_(mha.W_k.bias.data)
-        if mha_cp.W_v.bias is not None and mha.W_v.bias is not None:
-            mha_cp.W_v.bias.copy_(mha.W_v.bias.data)
-
-        # Copy output projection unchanged
-        mha_cp.W_o.weight.copy_(mha.W_o.weight.data)
-        if mha_cp.W_o.bias is not None and mha.W_o.bias is not None:
-            mha_cp.W_o.bias.copy_(mha.W_o.bias.data)
+        # Copy output projection from compressed weights
+        mha_cp.W_o.weight.copy_(torch.from_numpy(Wo_new).to(device))
 
     weights_t = torch.as_tensor(weights, dtype=torch.float32, device=device)
     return mha_cp, weights_t
+
+
+if __name__ == '__main__':
+    mha = MultiHeadAttention(d_model=10000, d_heads=5000, d_in=2, d_out=2)
+    mha_cp, head_weights = compress_mha(mha, k=2, dstop=203, print_progress=True)
