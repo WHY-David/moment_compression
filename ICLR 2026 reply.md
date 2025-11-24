@@ -243,7 +243,6 @@ The theoretical claim of polylogarithmic compression yielding a stretched-expone
 **A5.** Thanks for this interesting question. Extending the theory to functions with a limited smoothness is an important future step. There are conventional wisdoms of how smoothness is related to how compressible or approximatable a function is (sometimes known as the blessing of smoothness). Some works imply that the best compression rate is $d^{-k}$ if the network uses ReLU^k as the activation (e.g., doi.org/10.1007/s00211-023-01384-6). However, a unified theory linking generic nonsmoothness to compression is an open and important problem.
 
 
-==你说的对。光滑性和可压缩性的定量关系是很有意思的future work. Empirically用很小的k就已经很有用了==
 
 # Reviewer LiWj
 
