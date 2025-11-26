@@ -225,7 +225,7 @@ def compress_mha(
     # 1) Extract original per-head parameter rows
     w_orig = extract(mha)              # (d_heads_orig, num_params_head_orig)
     # d_heads_orig = w_orig.shape[0]
-    # print(w_orig.shape)
+    print(w_orig.shape)
 
     # 2) Compress across heads
     cp = Compressor(w_orig, tol=tol)

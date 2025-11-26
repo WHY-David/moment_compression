@@ -16,7 +16,8 @@ def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
     d, m = data.shape
     assert x.shape[0] == m
     y = data @ x
-    y = 1./(1+np.exp(-1*y))
+    # y = 1./(1+np.exp(-1*y))
+    y = 1./(1.05+y)
     # y = np.sin(2*np.pi*y)
     y = np.mean(y, axis=1)
     if weights is not None:
@@ -29,8 +30,8 @@ def f(data: np.ndarray, x:np.ndarray, weights=None) -> float:
 
 # determine the final data set size
 def dstop(d):
-    # return int(120*np.log(d))
-    return int(20*(np.log(d))**2)
+    return int(120*np.log(d))
+    # return int(20*(np.log(d))**2)
 
 def run_trial(args):
     m, d, t = args
@@ -41,7 +42,8 @@ def run_trial(args):
     f_orig = f(data, x)
     least_error = None
     
-    for k in range(1, int(np.sqrt(2*dstop(d)))-1):
+    # for k in range(1, int(np.sqrt(2*dstop(d)))-1):
+    for k in range(1, dstop(d)//2):
         worker = Compressor(data)
         c, W = worker.compress(k, dstop = dstop(d), print_progress=False)
         f_comp = f(W, x, weights=c)
@@ -60,14 +62,14 @@ def run_trial(args):
 
 if __name__ == "__main__":
     # parameters
-    mlist = [2,]
+    mlist = [1,]
     d_list = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000]
     trials_per_d = 5
     # num_samples = 10
 
     tasks = [(m, d, t) for m in mlist for d in d_list for t in range(trials_per_d)]
 
-    out_path = "polylog_error_list.csv"
+    out_path = "polylog_error_1d.csv"
     file_exists = os.path.exists(out_path)
 
     # Open once and append rows as each trial completes; flush+fsync for durability

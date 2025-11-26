@@ -3,23 +3,33 @@
 ## Official comment
 We thank all reviewers for the constructive feedback. To each reviewer, we reply to every weakness and question in detail below. Here, we summarize our main contribution, which seems to be misunderstood, and the changes we have made to improve the manuscript. We also point out criticisms that we feel are unfair. After revision, we believe we have addressed all the concerns of the reviewers.
 
+
 We would like to emphasize that our contribution is theoretical, and establishes this key, universal result: there exists a compression map from many objects to a polylog-size subset of objects, which keeps the value of almost all symmetric outputs unchanged. Such a universal result is important, unprecedented and difficult, so is worthy of acceptance on its own. It could also have major applications across many subfields of AI. We also do our best to demonstrate our theory in experiment and all our experiments are designed to illustrate our theory, NOT for demonstrating its practical efficiency advancements. While we do believe future works will establish practical relevance of our work, our current manuscript makes zero claims about practice and it is beyond the scope of our work to propose or establish a practical algorithm. In fact, in our manuscript we stated clearly that “The central contribution of our theory is a proof of concept that it is theoretically possible to strongly compress neural networks and datasets, enabling far more efficient use of data and parameters. An important future direction is therefore to develop practical compression algorithms that can improve neural scaling laws at scale.” However, the most common criticisms we receive are about the practicality of the algorithm we used to evaluate the theory, which we feel is unfair. In fact, it is not quite reasonable to evaluate our moment-matching compression method, which we merely intend to show the existence of universal compression, with gauges like performance or computational efficiency improvements.
+
+
+We invite the reviewers to ask additional questions and help us further improve the manuscript. 
+
 
 **List of changes:**
 
+
 1. Replaced the proof of the optimality of $\log^m (d)$ in Appendix B. The new proof is self consistent and does not rely on any conjectures.
 2. The new Appendix F on the permutation symmetry in transformers, and how to apply compression to transformers. 
-3. Replaced $\omega(d)$ by $\varepsilon(d)$ to avoid ambiguity. Added examples ($\varepsilon(d) = d^{-\alpha}$ ) to help understand the results of Theorems 4 and 7
-4. Fixed the broken reference in line 190: “Appendix ??” -> “Appendix D”
+3. The new Appendix G on numerically showing compression to polylog(d).
+4. Replaced $\omega(d)$ by $\varepsilon(d)$ to avoid ambiguity. Added examples ($\varepsilon(d) = d^{-\alpha}$ ) to help understand the results of Theorems 4 and 7
+5. Fixed the broken reference in line 190: “Appendix ??” -> “Appendix D”
+6. Other minor revisions. 
 
-We invite the reviewers to ask additional questions and help us further improve the manuscript. 
+
+
 
 **New numerical experiments:**
 
 
+
 1. Compressing an attention module and showing LTH-like consistency (Appendix F) (related to questions from Reviewers 1dtD and YxjE)
-2. Compression algorithm runtim vs d (Appendix D) (related to questions from Reviewer 1dtD)
-3. Demonstration of the ability to compress d to log(d) when $m=1$ ==TODO== (related to questions from Reviewers YxjE and ui4S)
+2. Compression algorithm runtime vs d (Appendix D) (related to questions from Reviewer 1dtD)
+3. Demonstration of the ability to compress d to log(d) when $m=1$ or $2$ (Appendix G) (related to questions from Reviewers YxjE and ui4S)
 
 
 
@@ -120,15 +130,35 @@ As the reviewer pointed out, learning a lowest-dimensional manifold is hard—in
 
 Our ability to perform numerical experiments in larger dimensions is unfortunately limited by resource. For example, $m=100$. By Theorem 4, $k$ needs to be at the same order as $m$ to get a vanishing error. Let’s say $k=100$. Then $\binom{m+k}{k} \approx 10^{59}$. This means that we are guaranteed to be able to compress losslessly when $d\gg 10^{59}$, which, although sounds formidable, is still consistent as we always set $d$ to be the largest scale in our problem. 
 
-Nevertheless, in the new draft, we added an example of compressing a multi-head attention module which has larger effective $m$ than any of the existing experiments, which is $m=?$. ==This is presented in Appendix ?==
+Nevertheless, in the new draft, we added an example of compressing a multi-head attention module which has larger effective $m$ than any of the existing experiments, which is $m=8$. See the new Appendix F. 
 
 
 
 **Q7.** I kindly ask to address my concerns in Weakness 1. In particular, I am interested in the numerical verification of the bounds provided.
 
-**A7.** The power-law bound derived in Theorem 4 is well verified in Fig. 2. We conducted a new numerical verification for $m=1$ and $m=2$, showing that compressing to $\log^m d$ is indeed possible, which is presented in Appendix ==?TODO==. 
+**A7.** The power-law bound derived in Theorem 4 is well verified in Fig. 2. We conducted a new numerical verification for $m=1$ and $m=2$, showing that compressing to $\log^m d$ is indeed possible, which is presented in Appendix G. However, we admit that compressing to polylog(d) requires tremendous resource for our current algorithm, and hence we are not able to quantitatively compare the residual error to theoretical predictions as we did for finite k in Fig. 2. The errors are shown to be overall vanishing, but also shows visible oscillation, possibly due to the volatile moment-matching order $k_{\mathrm{opt}}$ and finite-size ($d$) effect. 
 
 
+
+## Round 2 to YxjE
+
+Thank you for promptly clarifying your concerns!
+
+**Q1. Numerical non-smoothness**
+
+I respectfully disagree with the authors. In Deep Learning, we deal with functions that can become arbitrarily ill-posed; indeed, they often do so even when acquired through SGD-based optimization. Therefore, it is not theoretically sound to assume that the radius of convergence, (for function in Eq. 44; *please, also note the notational conflict with in Eq. 4*), is constant with respect to . On the contrary, [1] suggests that may decrease rapidly with increasing . This directly impacts the asymptotics in Eq. 44, which is a theoretical, not merely a practical, problem.
+
+**A1.** Thanks for point out the notational conflict. We changed the function $\rho$ in the deep-set representation Eq. (4) to $h$. 
+
+**Q2. Overfitting**
+
+Let me clarify my concern. As I understand it, in practice, the network is compressed to preserve its performance on the **training data**, as using evaluation data would lead to information leakage. The text appears to provide no theoretical guarantees on the evaluation loss when the symmetric function is defined solely through the training set. I suspect such guarantees are impossible to provide because the primary driver of good generalization in overparameterized regimes is the implicit biases of NNs and SGD, which is not respected by the proposed compression method. I.e., one can not achieve good compression on the test set without having this set in the first place.
+
+This logic also applies to the scaling laws. For instance, (Henighan et al., 2020) derive empirical laws connecting evaluation performance to factors like network size. While one could plug this paper's results into such laws, we can only guarantee that the training performance will be maintained, not the evaluation performance.
+
+**A2.** “The network is compressed to preserve its performance on the **training data**”—on contrary, there exists a compression map that is designed to keep the value of **virtually any symmetric function** unchanged. Although we always meant so, our Theorems 4 and 7 might have not made it clear enough. 
+
+Maintaining the value of only one symmetric function is rather trivial. 
 
 
 
@@ -168,7 +198,7 @@ We appreciate the reviewer’s effort and constructive comments which helped us 
 **Weaknesses:**
 
 **W1.** The paper lacks a thorough discussion on the applicability of the proposed theory to complex neural architectures such as Transformer blocks, which integrate linear projections, attention mechanisms, and normalization layers.
-**A1.** In principle, the theory can be applied to attention layers in two different ways. We briefly mentioned these points in Section 2, around line 101; in the revised draft, we added the new Appendix F to expand the discussion on transformers, including a minimal numerical showcase of the effectiveness of compressing transformers. 
+**A1.** Our compression theory can be applied to attention layers in two different ways. We briefly mentioned these points in Section 2, around line 101; in the revised draft, we added the new Appendix F to expand the discussion on transformers, including a minimal numerical showcase of the effectiveness of compressing transformers. 
 
 The first is a rather trivial application to compressing query and key matrices, and the second is the more interesting and complicated compression of attention heads.
 The first is a trivial application to the key and query weight matrices $W_Q$ and $W_K$ – which is a good sanity check for our theory. The output of the attention logit depends on the product of the two matrices: $a=a(W_Q W_K)$, notice that one can write this product as the following sum of outer product:
@@ -210,31 +240,35 @@ where $U_i  \in \mathbb{R}^{z \times h}$ is the block of $U$ that takes the outp
 
 **Weaknesses:**
 **W1.** Further empirical evaluation would strengthen this work, as the authors note.
-**A1.** Make a list of added experiments.  [todo]
+**A1.** In the revised paper, we added the following numerical experiments: 
+1. Compressing an attention module and showing LTH-like consistency (Appendix F) (related to questions from Reviewers 1dtD and YxjE)
+2. Compression algorithm runtime vs d (Appendix D) (related to questions from Reviewer 1dtD)
+3. Demonstration of the ability to compress d to log(d) when $m=1$ or $2$ (Appendix G) (related to questions from Reviewers YxjE and ui4S)
+
 
 **W2.** The proposed moment-matching algorithm scales poorly with moment order $k$ and dimension $m$ (via $\binom{m+k}{k}$), which limits immediate practical effects despite the asymptotic guarantees.
 **A2.** Thanks for this criticism, we agree. However, we would like to emphasize that our primary contribution is theoretical, and the method we suggested primarily serves as part of the constructive proof and a proof of principle. Our theory motivates the search for more efficient ways to compress models and data, we believe these are important future works.
 
-The theoretical claim of polylogarithmic compression yielding a stretched-exponential scaling $\text{exp} (- \sqrt[m]{d})$ is not supported with evidence. The numerical experiments in Section 6 demonstrate how the scaling laws can be improved only for quadratic compression.
-[todo] Also mentions figure 2
-==用1维压缩到polylog的实验来回答这个问题 重写这个回答==
+**W3.** The theoretical claim of polylogarithmic compression yielding a stretched-exponential scaling $\text{exp} (- \sqrt[m]{d})$ is not supported with evidence. The numerical experiments in Section 6 demonstrate how the scaling laws can be improved only for quadratic compression.
+
+**A3.** In fact, our FIg. 2 is intended to show that the compression residual error vanishes as expected. In the revised paper, we added a numerical experiment that compresses $d$ to $\operatorname{polylog}(d)$, which supports the ability to improve power-law scaling laws to stretched-exponential. However, we admit that compressing to polylog(d) requires tremendous resource for our current algorithm, and hence we are not able to quantitatively compare the residual error to theoretical predictions as we did for finite k in Fig. 2. The errors are shown to be overall vanishing, but also shows visible oscillation, possibly due to the volatile moment-matching order $k_{\mathrm{opt}}$ and finite-size ($d$) effect. 
+
+
 
 **Questions:**
 
-**Q3.** Can you show an example with the scaling laws of a form $L \approx L_0 + c \text{exp} (- \alpha’ \sqrt[m]{d})$ to illustrate the stretched-exponential regime?
-**A3.** ==Added [todo]==
+**Q4.** Can you show an example with the scaling laws of a form $L \approx L_0 + c \text{exp} (- \alpha’ \sqrt[m]{d})$ to illustrate the stretched-exponential regime?
+**A4.** See our reply in **[A3]**. 
 
+**Q5.** In numerical experiments in Section 6 the exponent should have improved by a factor of 2: $C d^{-\alpha} = C (\frac{d’}{16})^{-2 \alpha} =C’ (d’)^{-2\alpha} $. The reported values are close but lower, 1.271 vs $2\alpha = 1.366$ and 0.608 vs $2 \alpha=0.616$. Why does this difference appear? And why is it larger for dataset compression? 
 
-**Q4.** In numerical experiments in Section 6 the exponent should have improved by a factor of 2: $C d^{-\alpha} = C (\frac{d’}{16})^{-2 \alpha} =C’ (d’)^{-2\alpha} $. The reported values are close but lower, 1.271 vs $2\alpha = 1.366$ and 0.608 vs $2 \alpha=0.616$. Why does this difference appear? And why is it larger for dataset compression? 
-
-**A4.** Thanks for this question. First of all, this is a rather small deviation, and as in any empirical science, the theoretical values will have some deviation from the empirical results due to, for example, systematic errors in the experiments. The main reason of this deviation is a finite-size ($d$) effect. Concretely, compression induces an error $d^{-\beta}$ where $\beta>\alpha$. But at finite $d$ it still affects the observed scaling law. Another possible source of error is the numerical precision of the FP32 format. Testing the actual reasons of these deviations is an interesting future problem.
-
+**A5.** Thanks for this question. First of all, this is a rather small deviation, and as in any empirical science, the theoretical values will have some deviation from the empirical results due to, for example, systematic errors in the experiments. The main reason of this deviation is a finite-size ($d$) effect. Concretely, compression induces an error $d^{-\beta}$ where $\beta>\alpha$. But at finite $d$ it still affects the observed scaling law. Another possible source of error is the numerical precision of the FP32 format. Testing the actual reasons of these deviations is an interesting future problem.
 
 
 
-**Q5.** Many elements of modern neural networks do not fall under the smoothness assumptions, like ReLU, top-k selections, sparse \ quantized representations. How do you imagine expanding your work around those limitations and how would compression rates be affected?
+**Q6.** Many elements of modern neural networks do not fall under the smoothness assumptions, like ReLU, top-k selections, sparse \ quantized representations. How do you imagine expanding your work around those limitations and how would compression rates be affected?
 
-**A5.** Thanks for this interesting question. Extending the theory to functions with a limited smoothness is an important future step. There are conventional wisdoms of how smoothness is related to how compressible or approximatable a function is (sometimes known as the blessing of smoothness). Some works imply that the best compression rate is $d^{-k}$ if the network uses ReLU^k as the activation (e.g., doi.org/10.1007/s00211-023-01384-6). However, a unified theory linking generic non-smoothness to compression is an open problem beyond our scope.
+**A6.** Thanks for this interesting question. Extending the theory to functions with a limited smoothness is an important future step. There are conventional wisdoms of how smoothness is related to how compressible or approximatable a function is (sometimes known as the blessing of smoothness). Some works imply that the best compression rate is $d^{-k}$ if the network uses ReLU^k as the activation (e.g., doi.org/10.1007/s00211-023-01384-6). However, a unified theory linking generic non-smoothness to compression is an open problem beyond our scope.
 
 
 

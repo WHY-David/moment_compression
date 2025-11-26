@@ -5,7 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 
-from mha import MultiHeadAttention  # your implementation
+from common import fix_random_seed, compress_nn, make_canvas
+from mha import MultiHeadAttention, MultiHeadAttentionW, compress_mha  # your implementation
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
@@ -60,7 +61,7 @@ def sample_episode_batch(batch_size, n_ctx, noise_std=0.05):
     - Sample random functions f
     - Sample context points x_i, noisy y_i = f(x_i) + noise
     - Sample query x*, target y* = f(x*) (no noise)
-    - Return tokens X: (B, T=n_ctx+1, d_in=3) with tokens (x_i, y_i, r) and (x*, 0, 1),
+    - Return tokens X: (B, T=n_ctx+1, d_in=2) with tokens (x_i, y_i) and (x*, 0),
       and targets y_query: (B,)
     """
     # Random function params
@@ -76,14 +77,15 @@ def sample_episode_batch(batch_size, n_ctx, noise_std=0.05):
     y_q = eval_functions(x_q, a, mu, sigma, b0, b1)  # clean (no noise)
     y_q = y_q.squeeze(-1)  # (B,)
 
-    # Tokens: (x_i, y_i, 0) for context; (x_q, 0, 1) for query (role bit)
-    r_ctx = torch.zeros_like(x_ctx)
-    z_ctx = torch.stack([x_ctx, y_ctx, r_ctx], dim=-1)  # (B, n_ctx, 3)
-    r_q = torch.ones_like(x_q).squeeze(-1)
-    z_q = torch.stack([x_q.squeeze(-1), torch.zeros_like(x_q).squeeze(-1), r_q], dim=-1)  # (B, 3)
-    z_q = z_q.unsqueeze(1)  # (B, 1, 3)
+    # Tokens: (x_i, y_i) for context; (x_q, 0) for query
+    z_ctx = torch.stack([x_ctx, y_ctx], dim=-1)  # (B, n_ctx, 2)
+    z_q = torch.stack(
+        [x_q.squeeze(-1), torch.zeros_like(x_q).squeeze(-1)],
+        dim=-1,
+    )  # (B, 2)
+    z_q = z_q.unsqueeze(1)  # (B, 1, 2)
 
-    X = torch.cat([z_ctx, z_q], dim=1)  # (B, T=n_ctx+1, 3)
+    X = torch.cat([z_ctx, z_q], dim=1)  # (B, T=n_ctx+1, 2)
     return X, y_q
 
 
@@ -103,7 +105,7 @@ def causal_mask(batch_size, T):
 # ---- Model ----
 
 class ICLModel(nn.Module):
-    def __init__(self, d_heads=512, d_head=2, d_in=3, d_out=1):
+    def __init__(self, d_heads=512, d_head=2, d_in=2, d_out=1):
         super().__init__()
         d_model = d_heads * d_head
         self.mha = MultiHeadAttention(
@@ -115,7 +117,7 @@ class ICLModel(nn.Module):
 
     def forward(self, X):
         """
-        X: (B, T, d_in=3)
+        X: (B, T, d_in=2)
         Returns prediction for the last token (query): shape (B,)
         """
         B, T, _ = X.shape
@@ -131,13 +133,13 @@ def train_icl(
     epochs=50,
     batch_size=64,
     n_ctx=8,
-    d_heads=512,   # you can increase (e.g. 1000) if compute allows
+    d_heads=512,   
     d_head=2,
     lr=1e-3,
     train_steps_per_epoch=200,
     test_batches=100,
 ):
-    model = ICLModel(d_heads=d_heads, d_head=d_head, d_in=3, d_out=1).to(device)
+    model = ICLModel(d_heads=d_heads, d_head=d_head, d_in=2, d_out=1).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
 
@@ -149,7 +151,7 @@ def train_icl(
         epoch_train_loss = 0.0
 
         for _ in range(train_steps_per_epoch):
-            X, y = sample_episode_batch(batch_size, n_ctx)  # X:(B,T,3), y:(B,)
+            X, y = sample_episode_batch(batch_size, n_ctx)  # X:(B,T,2), y:(B,)
             y_hat = model(X)
             loss = criterion(y_hat, y)
 
@@ -184,16 +186,44 @@ def train_icl(
 
 
 if __name__ == "__main__":
+    save_csv = True
+    save_pdf = True
+    seed = 42
+    fix_random_seed(seed)
+
     epochs = 50
+    epochs = epochs
+    batch_size = 256 
+    n_ctx = 16
+    d_heads = 64 
+    d_head = 2
+
+    train_steps_per_epoch = 100
+    test_batches = 100
+
+    algo_name = 'Adam'
+    lr = 1e-3
+    algo = torch.optim.Adam
+
+
+    # construct the models
+    model_orig = MultiHeadAttention(
+        d_model=d_heads * d_head,
+        d_heads=d_heads,
+        d_in=2,
+        d_out=1,
+    ).to(device)
+
+    
     model, train_losses, test_losses = train_icl(
         epochs=epochs,
-        batch_size=256,
-        n_ctx=16,
-        d_heads=32, 
-        d_head=2,
-        lr=1e-2,
-        train_steps_per_epoch=200,
-        test_batches=100,
+        batch_size=batch_size,
+        n_ctx=n_ctx,
+        d_heads=d_heads, 
+        d_head=d_head,
+        lr=lr,
+        train_steps_per_epoch=train_steps_per_epoch,
+        test_batches=test_batches,
     )
 
     # Plot train/test loss vs epoch
