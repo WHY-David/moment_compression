@@ -1,0 +1,23 @@
+# Pip fallback for environment.yml. Python ≤ 3.12 per supplementary/README.md
+# (faiss-cpu wheels on PyPI cover 3.9–3.12; 3.13+ is not supported). The
+# original workflow used conda (`conda install -c pytorch faiss-cpu`), so
+# prefer environment.yml if you can.
+
+numpy>=1.24
+scipy>=1.11
+scikit-learn>=1.3
+joblib>=1.3
+faiss-cpu>=1.7
+
+# Needed by every training experiment (Figs. 3, 4, 5, 7). torch>=2.3 exposes
+# torch.amp.{autocast, GradScaler}; earlier releases only ship torch.cuda.amp.
+torch>=2.3
+
+# Plotting / notebooks
+matplotlib>=3.7
+pandas>=2.0
+jupyter
+ipykernel
+
+# Progress bars (used by the archived GPU prototype under gpu/)
+tqdm

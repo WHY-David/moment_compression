@@ -1,0 +1,37 @@
+name: torch-env
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  # Python ≤ 3.12 per supplementary/README.md (faiss-cpu ships conda wheels
+  # up through 3.12 only; later Python is not verified).
+  - python=3.12
+
+  # Core numerical stack
+  - numpy
+  - scipy
+  - scikit-learn
+  - joblib
+
+  # Nearest-neighbour clustering used by Compressor._find_best_subset.
+  # supplementary/README.md specifies the `pytorch` channel explicitly.
+  - pytorch::faiss-cpu
+
+  # Deep-learning experiments (Figs. 3–5, 7). supplementary/README.md just
+  # says "PyTorch: CPU or CUDA version" without a pin. torch>=2.3 is a soft
+  # preference because scaling_law/width.py uses torch.amp.{autocast,
+  # GradScaler} (public API only since 2.3); earlier torch works everywhere
+  # else. Drop the ">=2.3" if you have a working older build.
+  - pytorch::pytorch>=2.3
+
+  # Plotting / notebooks
+  - matplotlib
+  - pandas
+  - jupyter
+  - ipykernel
+
+  # pip extras in case a conda build is missing for your platform
+  - pip
+  - pip:
+      - tqdm
