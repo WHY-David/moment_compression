@@ -45,7 +45,7 @@ Tests `|f(θ') − f(θ)| ∝ d^{-α}` for the sigmoid-of-inner-product function
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Data / compression sweep | [error_scaling/error_scaling.py](error_scaling/error_scaling.py) (hard-coded grid over `m, k, d`; appends to `sqrt_error_list.csv` / `error_list.csv`)                                              |
 | Random point generator   | [error_scaling/data_gen.py](error_scaling/data_gen.py)                                                                                                                                              |
-| Slurm job launcher       | [error_scaling/job_array.py](error_scaling/job_array.py), [error_scaling/job.slurm](error_scaling/job.slurm)                                                                                        |
+| Slurm job launcher       | [error_scaling/job_array.py](error_scaling/job_array.py)                                                                                                                                            |
 | Panels (a–e) plot        | [error_scaling/plot.ipynb](error_scaling/plot.ipynb) using `error_list.csv` / `sqrt_error_list.csv`; writes `errors_m{1..5}.pdf`, `error_alpha.pdf`, then combined into `figures/error_scaling.pdf` |
 
 ### Fig. 3 — Compression of the training dataset (`compress_trainds.pdf`, Sec. 3.2)
@@ -79,7 +79,6 @@ Panel (a) uses the Fig. 3 task; panel (b) uses the Fig. 4 task. For both panels 
 | (a) Dataset-size scaling (Slurm array over `d, seed`) | [scaling_law/trainds.py](scaling_law/trainds.py) → [scaling_law/trainds_scaling.csv](scaling_law/trainds_scaling.csv)                                                                                                       |
 | (b) Width scaling (Slurm array over `d, seed`)        | [scaling_law/width.py](scaling_law/width.py) → per-run csvs in [scaling_law/LTH_harm_AdamW_k6_trains1000000_noise0.2_bs512_lr0.001_epoch200/](scaling_law/LTH_harm_AdamW_k6_trains1000000_noise0.2_bs512_lr0.001_epoch200/) |
 | Shared helpers (model, cyl harmonic, canvas)          | [scaling_law/common.py](scaling_law/common.py), [scaling_law/data_gen.py](scaling_law/data_gen.py)                                                                                                                          |
-| Linear-regression sanity check for NSL                | [scaling_law/linreg.py](scaling_law/linreg.py)                                                                                                                                                                              |
 | Fitting `α`, panel composition → `NSL.pdf`            | [scaling_law/plot.ipynb](scaling_law/plot.ipynb) (also saves `NSL_dataset.pdf`, `NSL_width.pdf`)                                                                                                                            |
 
 ### Fig. 6 — Runtime benchmark of the hybrid algorithm (`runtime_plot.pdf`, Appendix `app:algorithm`)
@@ -122,8 +121,4 @@ All figures (except Fig. 1) depend on:
 
 ### Stale / superseded directories (not used by final figures)
 
-- [sine_regression/](sine_regression/) — earlier 1-D sine-regression prototype of LTH (superseded by [new/](new/)).
-- [MNIST/](MNIST/) — exploratory MNIST CNN / autoencoder (not in the paper).
-- [fxy/](fxy/), [gpu/](gpu/), [grok/](grok/) — abandoned variants (f(x,y) trainer, GPU compressor prototype, grokking experiment).
 - [supplementary/](supplementary/) — a trimmed copy of the core scripts packaged for anonymous submission; duplicates [new/](new/).
-- [playground.ipynb](playground.ipynb) — scratch notebook.
