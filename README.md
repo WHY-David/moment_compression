@@ -1,8 +1,6 @@
 # moment_compression
 
-Code accompanying [_A Universal Compression Theory for the Lottery Ticket Hypothesis and Neural Scaling Laws_](ICLR2026_A_Universal_Compression_Theory/ICLRver.tex) (Wang, Luo, Poggio, Chuang, Ziyin; ICLR 2026). The paper shows that any permutation-invariant function of `d` objects can be losslessly compressed (in the asymptotic sense) to `O(polylog d)` weighted objects by matching the first `k` tensor moments, which in turn gives the dynamical lottery ticket hypothesis and stretched-exponential improvements to neural scaling laws.
-
-Companion docs: [PAPER_SUMMARY.md](PAPER_SUMMARY.md) (figure → script map), [CLEANUP_PLAN.md](CLEANUP_PLAN.md) (release-quality checklist).
+Code accompanying [_A Universal Compression Theory for the Lottery Ticket Hypothesis and Neural Scaling Laws_](ICLR2026_A_Universal_Compression_Theory/ICLRver.tex) (Hong-Yi Wang, Di Luo, Tomaso Poggio, Isaac L. Chuang, Liu Ziyin; ICLR 2026). The paper shows that any permutation-invariant function of `d` objects can be losslessly compressed (in the asymptotic sense) to `O(polylog d)` weighted objects by matching the first `k` tensor moments, which in turn gives the dynamical lottery ticket hypothesis and stretched-exponential improvements to neural scaling laws.
 
 ---
 
@@ -63,6 +61,14 @@ Expected: `kept 10 of 2000` — that's `C(m+k, k) = C(5,2) = 10`, the Tchakaloff
 - Internally `compress` first runs sample-weighted `MiniBatchKMeans` while `|supp c| ≫ dstop`, then hands off to a FAISS nearest-neighbour greedy phase. IVF indexing kicks in above `d ≈ 10⁷`; below that, the code falls back to `IndexFlatL2` transparently.
 - Extending: the two workhorse methods are `_find_best_subset` (the greedy cluster picker) and `_reduce_compute` (Carathéodory peeling via SVD null-vector). Replacing either is the main way to customise the algorithm without breaking the outer interface.
 
+## `demo/`
+
+[demo/](demo/) is a tutorial folder. It shows basic use cases of `Compressor` at small scale, so every script here finishes on a laptop CPU:
+
+- [demo/demo.py](demo/demo.py) — visualises 2-D and 3-D random-point clouds and their weighted-object compression with `dstop = C(m+k, k)`. Running `python demo/demo.py` pops a side-by-side scatter of 1000 3-D Gaussian points and their 40-atom moment-matching compression (marker size ∝ weight).
+- [demo/trainds.py](demo/trainds.py) — small-scale version of Fig. 3 (compressing the training dataset). Hyperparameters are at lines 103–118.
+- [demo/compress_dynamics.py](demo/compress_dynamics.py) — small-scale version of Fig. 4 (dynamical lottery ticket hypothesis). Hyperparameters are at lines 137–183.
+
 ## Reproducing the figures
 
 Each paper figure has its own top-level folder. Inside, `run script → CSV → plot notebook → PDF`:
@@ -85,13 +91,6 @@ The quickest paths:
 - **Fig. 2 error scaling** (dial down `d_list`, `mlist`, `k_list`, `trials_per_d` at the bottom of the script for a fast preview): `cd fig2_error_scaling && python error_scaling.py`.
 - **Figs. 5** is a Slurm-array sweep over `(d, seed)`; see the `sid = int(os.environ["SLURM_ARRAY_TASK_ID"])` pattern in [trainds.py](fig5_scaling_law/trainds.py) and [width.py](fig5_scaling_law/width.py). For a single-seed preview, replace the `sid` block with hard-coded `seed, d`.
 
-## `demo/`
-
-[demo/](demo/) is a self-contained tutorial folder (renamed from the anonymous-submission supplementary). It shows basic use cases of `Compressor` at small scale, so every script here finishes on a laptop CPU:
-
-- [demo/demo.py](demo/demo.py) — visualises 2-D and 3-D random-point clouds and their weighted-object compression with `dstop = C(m+k, k)`. Running `python demo/demo.py` pops a side-by-side scatter of 1000 3-D Gaussian points and their 40-atom moment-matching compression (marker size ∝ weight).
-- [demo/trainds.py](demo/trainds.py) — small-scale version of Fig. 3 (compressing the training dataset). Hyperparameters are at lines 103–118.
-- [demo/compress_dynamics.py](demo/compress_dynamics.py) — small-scale version of Fig. 4 (dynamical lottery ticket hypothesis). Hyperparameters are at lines 137–183.
 
 ## Dependencies at a glance
 
@@ -114,7 +113,6 @@ No `pandas` imports exist in [compressor.py](compressor.py) itself — the core 
 - **`ModuleNotFoundError: No module named 'compressor'`** — run from the repo root, or run the experiment scripts from inside their `figN_*` folder (each figure script has a `sys.path.insert(…, '..')` shim that reaches the root `compressor.py`).
 - **`faiss` install fails on Python 3.13** — downgrade to 3.12 (conda wheels). 3.13 wheels are not yet published as of this writing.
 - **`torch.backends.mps.deterministic` AttributeError** — PyTorch older than 2.1; upgrade to ≥ 2.3 to match the pinned environment.
-- **Out-of-memory during `Compressor.compress` at high `k`** — the moment matrix is `C(m+k, k) × d`. Drop `k`, or set `dstop` larger so more work stays in the cheap k-means phase.
 - **IVF fallback message `[fallback] IVF search failed …`** — harmless; the code switches itself to `IndexFlatL2` and retries. IVF is only beneficial at `d ≳ 10⁷`.
 
 ## Citations
