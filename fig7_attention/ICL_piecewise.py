@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Fig. 7 — Dynamical LTH for multi-head attention (Appendix `app:attention`).
+
+In-context learning of piecewise-linear 1-D functions with a d_heads=4000 MHA,
+compressed to d'=800 heads. Writes `icl_piecewise_losses_d{…}_lr{…}_ep{…}_spe{…}.csv`
+consumed by `plot.ipynb`. Run from this folder: `python ICL_piecewise.py`.
+"""
+
 import math
 import csv
 import torch

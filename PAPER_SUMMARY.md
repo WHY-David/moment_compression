@@ -41,75 +41,75 @@ Figure 1 (`illustration.pdf`) is a schematic and is excluded. Each entry below l
 
 Tests `|f(θ') − f(θ)| ∝ d^{-α}` for the sigmoid-of-inner-product function in Eq. (5), varying `m ∈ {1..5}` and `k`.
 
-| Step                     | File                                                                                                                                                                                                |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Data / compression sweep | [error_scaling/error_scaling.py](error_scaling/error_scaling.py) (hard-coded grid over `m, k, d`; appends to `sqrt_error_list.csv` / `error_list.csv`)                                              |
-| Random point generator   | [error_scaling/data_gen.py](error_scaling/data_gen.py)                                                                                                                                              |
-| Slurm job launcher       | [error_scaling/job_array.py](error_scaling/job_array.py)                                                                                                                                            |
-| Panels (a–e) plot        | [error_scaling/plot.ipynb](error_scaling/plot.ipynb) using `error_list.csv` / `sqrt_error_list.csv`; writes `errors_m{1..5}.pdf`, `error_alpha.pdf`, then combined into `figures/error_scaling.pdf` |
+| Step                     | File                                                                                                                                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Data / compression sweep | [fig2_error_scaling/error_scaling.py](fig2_error_scaling/error_scaling.py) (hard-coded grid over `m, k, d`; appends to `sqrt_error_list.csv` / `error_list.csv`)                                              |
+| Random point generator   | [fig2_error_scaling/data_gen.py](fig2_error_scaling/data_gen.py)                                                                                                                                              |
+| Slurm job launcher       | [fig2_error_scaling/job_array.py](fig2_error_scaling/job_array.py)                                                                                                                                            |
+| Panels (a–e) plot        | [fig2_error_scaling/plot.ipynb](fig2_error_scaling/plot.ipynb) using `error_list.csv` / `sqrt_error_list.csv`; writes `errors_m{1..5}.pdf`, `error_alpha.pdf`, then combined into `figures/error_scaling.pdf` |
 
 ### Fig. 3 — Compression of the training dataset (`compress_trainds.pdf`, Sec. 3.2)
 
 Teacher–student setup, 2-layer ReLU MLP teacher; compare training on full `d=10^4`, naïve subsample `d'=10^3`, and moment-matched `d'=10^3`.
 
-| Step                                                       | File                                                                                               |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Dataset generator                                          | [new/data_gen.py](new/data_gen.py)                                                                 |
-| Training + plot (full-batch variant)                       | [new/trainds_fullbatch.py](new/trainds_fullbatch.py)                                               |
-| Training + plot (mini-batch variant, used in final panels) | [new/trainds.py](new/trainds.py) writing into [new/CPTDS/](new/CPTDS/)                             |
-| Panel composition                                          | [new/plot.ipynb](new/plot.ipynb) (assembles panels a–d and exports `figures/compress_trainds.pdf`) |
+| Step                                                       | File                                                                                                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dataset generator                                          | [fig3_compress_trainds/data_gen.py](fig3_compress_trainds/data_gen.py)                                                                         |
+| Training + plot (full-batch variant)                       | [fig3_compress_trainds/trainds_fullbatch.py](fig3_compress_trainds/trainds_fullbatch.py)                                                       |
+| Training + plot (mini-batch variant, used in final panels) | [fig3_compress_trainds/trainds.py](fig3_compress_trainds/trainds.py) writing into [fig3_compress_trainds/CPTDS/](fig3_compress_trainds/CPTDS/) |
+| Panel composition                                          | [fig3_compress_trainds/plot.ipynb](fig3_compress_trainds/plot.ipynb) (assembles panels a–d and exports `figures/compress_trainds.pdf`)         |
 
 ### Fig. 4 — Dynamical lottery ticket hypothesis (`LTH.pdf`, Sec. 4)
 
 2-layer ReLU NN of width `d=10^4` vs. compressed width `d'=10^3` with `k=5`, across SGD / Adam / RMSprop / etc., learning the cylindrical harmonic `J_6(20r)cos(6θ)`.
 
-| Step                                  | File                                                                                                                        |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Data + NN + compression helpers       | [new/common.py](new/common.py) (defines `TwoLayerNet`, `WeightedTwoLayerNet`, `compress_nn`, `cyl_harmonic`, `make_canvas`) |
-| Per-optimiser training run            | [new/compress_dynamics.py](new/compress_dynamics.py) writing into [new/LTH/](new/LTH/)                                      |
-| Panel (a) ground-truth image          | [new/plot.ipynb](new/plot.ipynb)                                                                                            |
-| Panel composition → `figures/LTH.pdf` | [new/plot.ipynb](new/plot.ipynb)                                                                                            |
+| Step                                  | File                                                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Data + NN + compression helpers       | [fig4_lth/common.py](fig4_lth/common.py) (defines `TwoLayerNet`, `WeightedTwoLayerNet`, `compress_nn`, `cyl_harmonic`, `make_canvas`) |
+| Per-optimiser training run            | [fig4_lth/compress_dynamics.py](fig4_lth/compress_dynamics.py) writing into [fig4_lth/LTH/](fig4_lth/LTH/)                            |
+| Panel (a) ground-truth image          | [fig4_lth/plot.ipynb](fig4_lth/plot.ipynb) (cylindrical-harmonic cell)                                                                |
+| Panel composition → `figures/LTH.pdf` | [fig4_lth/plot.ipynb](fig4_lth/plot.ipynb)                                                                                            |
 
 ### Fig. 5 — Improved neural scaling law (`NSL.pdf`, Sec. 5)
 
 Panel (a) uses the Fig. 3 task; panel (b) uses the Fig. 4 task. For both panels `d' = [16√d]` with `k=6`.
 
-| Step                                                  | File                                                                                                                                                                                                                        |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (a) Dataset-size scaling (Slurm array over `d, seed`) | [scaling_law/trainds.py](scaling_law/trainds.py) → [scaling_law/trainds_scaling.csv](scaling_law/trainds_scaling.csv)                                                                                                       |
-| (b) Width scaling (Slurm array over `d, seed`)        | [scaling_law/width.py](scaling_law/width.py) → per-run csvs in [scaling_law/LTH_harm_AdamW_k6_trains1000000_noise0.2_bs512_lr0.001_epoch200/](scaling_law/LTH_harm_AdamW_k6_trains1000000_noise0.2_bs512_lr0.001_epoch200/) |
-| Shared helpers (model, cyl harmonic, canvas)          | [scaling_law/common.py](scaling_law/common.py), [scaling_law/data_gen.py](scaling_law/data_gen.py)                                                                                                                          |
-| Fitting `α`, panel composition → `NSL.pdf`            | [scaling_law/plot.ipynb](scaling_law/plot.ipynb) (also saves `NSL_dataset.pdf`, `NSL_width.pdf`)                                                                                                                            |
+| Step                                                  | File                                                                                                                                                                                                                                          |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) Dataset-size scaling (Slurm array over `d, seed`) | [fig5_scaling_law/trainds.py](fig5_scaling_law/trainds.py) → [fig5_scaling_law/trainds_scaling.csv](fig5_scaling_law/trainds_scaling.csv)                                                                                                     |
+| (b) Width scaling (Slurm array over `d, seed`)        | [fig5_scaling_law/width.py](fig5_scaling_law/width.py) → per-run csvs in [fig5_scaling_law/CPU_harm_AdamW_k6_trains20000_noise0.2_bs128_lr0.001_epoch2000/](fig5_scaling_law/CPU_harm_AdamW_k6_trains20000_noise0.2_bs128_lr0.001_epoch2000/) |
+| Shared helpers (model, cyl harmonic, canvas)          | [fig5_scaling_law/common.py](fig5_scaling_law/common.py), [fig5_scaling_law/data_gen.py](fig5_scaling_law/data_gen.py)                                                                                                                        |
+| Fitting `α`, panel composition → `NSL.pdf`            | [fig5_scaling_law/plot.ipynb](fig5_scaling_law/plot.ipynb) (also saves `NSL_dataset.pdf`, `NSL_width.pdf`)                                                                                                                                    |
 
 ### Fig. 6 — Runtime benchmark of the hybrid algorithm (`runtime_plot.pdf`, Appendix `app:algorithm`)
 
 Uniformly-sampled `(d, m=5)` cubes, `k=5`, measuring wall-clock runtime.
 
-| Step         | File                                                                                                                                                                                               |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Timing sweep | [runtime_benchmark/runtime.py](runtime_benchmark/runtime.py) + [runtime_benchmark/data_gen.py](runtime_benchmark/data_gen.py) → [runtime_benchmark/time_list.csv](runtime_benchmark/time_list.csv) |
-| Plot         | [runtime_benchmark/runtime_plot.ipynb](runtime_benchmark/runtime_plot.ipynb) → `runtime_plot.pdf`                                                                                                  |
+| Step         | File                                                                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Timing sweep | [fig6_runtime/runtime.py](fig6_runtime/runtime.py) + [fig6_runtime/data_gen.py](fig6_runtime/data_gen.py) → [fig6_runtime/time_list.csv](fig6_runtime/time_list.csv) |
+| Plot         | [fig6_runtime/runtime_plot.ipynb](fig6_runtime/runtime_plot.ipynb) → `runtime_plot.pdf`                                                                              |
 
 ### Fig. 7 — Dynamical LTH for multi-head attention (`attention.pdf`, Appendix `app:attention`)
 
 In-context learning of piecewise-linear 1-D functions; `d_heads = 4000` head MHA compared with compressed `d' = 800` head MHA and a random-head-subset baseline.
 
-| Step                                                    | File                                                                                                                                                        |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MHA module + `compress_mha`                             | [transformer/mha.py](transformer/mha.py)                                                                                                                    |
-| Piecewise-linear ICL task (used for the final figure)   | [transformer/ICL_piecewise.py](transformer/ICL_piecewise.py) (dataset: `generate_piecewise_linear_params`, `eval_piecewise_linear`, `sample_episode_batch`) |
-| Alternative smooth-function ICL variant (earlier draft) | [transformer/ICL.py](transformer/ICL.py), [transformer/compress_dynamics.py](transformer/compress_dynamics.py)                                              |
-| Teacher and helper utilities                            | [transformer/teacher.py](transformer/teacher.py), [transformer/common.py](transformer/common.py)                                                            |
-| Plot → `figures/attention.pdf`                          | [transformer/plot.ipynb](transformer/plot.ipynb) consuming `transformer/icl_piecewise_losses_*.csv`                                                         |
+| Step                                                    | File                                                                                                                                                                   |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MHA module + `compress_mha`                             | [fig7_attention/mha.py](fig7_attention/mha.py)                                                                                                                         |
+| Piecewise-linear ICL task (used for the final figure)   | [fig7_attention/ICL_piecewise.py](fig7_attention/ICL_piecewise.py) (dataset: `generate_piecewise_linear_params`, `eval_piecewise_linear`, `sample_episode_batch`)      |
+| Alternative smooth-function ICL variant (earlier draft) | [fig7_attention/ICL.py](fig7_attention/ICL.py), [fig7_attention/compress_dynamics.py](fig7_attention/compress_dynamics.py)                                             |
+| Teacher and helper utilities                            | [fig7_attention/teacher.py](fig7_attention/teacher.py), [fig7_attention/common.py](fig7_attention/common.py), [fig7_attention/data_gen.py](fig7_attention/data_gen.py) |
+| Plot → `figures/attention.pdf`                          | [fig7_attention/plot.ipynb](fig7_attention/plot.ipynb) consuming `fig7_attention/icl_piecewise_losses_*.csv`                                                           |
 
 ### Fig. 8 — polylog-compression error scaling (`error_scaling_polylog.pdf`, Appendix)
 
 For each `d`, sweeps `k` up to `dstop/2 ≈ 60 log d` to find the smallest error; `dstop(d) = 120 log d`. Demonstrates that the polylog-rate predicted by Thm. `errorbound_polylog` can be attained numerically in `m=1,2`.
 
-| Step              | File                                                                                                                                         |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Compression sweep | [error_scaling/polylog_error.py](error_scaling/polylog_error.py) → `polylog_error_1d.csv`, `polylog_error_2d.csv`                            |
-| Plot              | [error_scaling/plot.ipynb](error_scaling/plot.ipynb) → `polylog_m1.pdf`, `polylog_m2.pdf`, combined into `figures/error_scaling_polylog.pdf` |
+| Step              | File                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Compression sweep | [fig8_polylog/polylog_error.py](fig8_polylog/polylog_error.py) → `polylog_error_1d.csv`, `polylog_error_2d.csv`                            |
+| Plot              | [fig8_polylog/plot.ipynb](fig8_polylog/plot.ipynb) → `polylog_m1.pdf`, `polylog_m2.pdf`, combined into `figures/error_scaling_polylog.pdf` |
 
 ### Shared core
 
@@ -118,7 +118,8 @@ All figures (except Fig. 1) depend on:
 - [compressor.py](compressor.py) — the `Compressor` class implementing `_find_best_subset` (FAISS greedy), `_reduce_compute` (Carathéodory peeling via `find_null_vec`), and the k-means/greedy hybrid `compress(k, dstop=…)`.
 - FAISS CPU for nearest-neighbour clustering; NumPy / SciPy for null-vector computation; scikit-learn `MiniBatchKMeans`; joblib for parallel reduction.
 - PyTorch for all training experiments (Figs. 3–5, 7).
+- Per-folder `common.py` and `data_gen.py`: each `figN_*/` folder keeps its own copy — these have diverged per experiment and are intentionally not consolidated.
 
-### Stale / superseded directories (not used by final figures)
+### Companion folder
 
-- [supplementary/](supplementary/) — a trimmed copy of the core scripts packaged for anonymous submission; duplicates [new/](new/).
+- [demo/](demo/) — self-contained tutorial folder (renamed from `supplementary/`) with `demo.py`, `trainds.py`, and `compress_dynamics.py` showing basic `Compressor` usage at small scale.

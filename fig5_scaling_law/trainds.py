@@ -1,3 +1,9 @@
+"""Fig. 5(a) — Dataset-size scaling for the improved neural scaling law (Sec. 5).
+
+Slurm array over `(d, seed)`; writes aggregated results to `trainds_scaling.csv`.
+Run from this folder under a Slurm array, or hard-code `sid` for a single-seed preview.
+"""
+
 import numpy as np
 import torch
 import torch.nn as nn

@@ -1,3 +1,9 @@
+"""Fig. 2 — Error scaling for a generic symmetric function (Sec. 3.2).
+
+Writes `sqrt_error_list.csv` / `error_list.csv` consumed by `plot.ipynb`.
+Run from this folder: `python error_scaling.py`.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp

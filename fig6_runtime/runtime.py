@@ -1,3 +1,9 @@
+"""Fig. 6 — Runtime benchmark of the hybrid compression algorithm (Appendix `app:algorithm`).
+
+Appends `(d, m, k, t_wallclock)` rows to `time_list.csv`, consumed by `runtime_plot.ipynb`.
+Run from this folder: `python runtime.py`.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp

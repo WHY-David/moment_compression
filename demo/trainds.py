@@ -162,6 +162,7 @@ if __name__ == "__main__":
 
     plt.tight_layout()
 
+    os.makedirs('CPTDS', exist_ok=True)
     filename = f'CPTDS/{task_name}_{algo_name}_d{d}_dstop{dstop}_k{k}_noise{train_noise}_hidden{hidden_dim}_bs{batch_size}_lr{lr}'
     with open(filename + '.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)

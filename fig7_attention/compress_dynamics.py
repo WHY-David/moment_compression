@@ -10,7 +10,7 @@ from scipy.special import jv
 
 from common import fix_random_seed, compress_nn, make_canvas, cyl_harmonic
 from mha import *
-# from data_gen import generate_data
+from data_gen import generate_data
 
 import sys
 import os

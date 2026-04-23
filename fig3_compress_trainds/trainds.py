@@ -1,3 +1,9 @@
+"""Fig. 3 — Compression of the training dataset (Sec. 3.2).
+
+Writes per-run CSV/PDF pairs into `CPTDS/` (created on demand), consumed by `plot.ipynb`.
+Run from this folder: `python trainds.py`.
+"""
+
 import numpy as np
 import torch
 import torch.nn as nn

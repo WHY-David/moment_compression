@@ -1,3 +1,9 @@
+"""Fig. 4 — Dynamical lottery ticket hypothesis (Sec. 4).
+
+Writes per-optimiser CSV/PDF pairs into `LTH/`, consumed by `plot.ipynb`.
+Run from this folder: `python compress_dynamics.py` (edit the optimiser/lr block at the bottom).
+"""
+
 import numpy as np
 import torch
 import torch.nn as nn

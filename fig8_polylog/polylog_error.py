@@ -1,3 +1,11 @@
+"""Fig. 8 — Polylog-compression error scaling (Appendix).
+
+For each d, sweeps k up to dstop/2 ≈ 60 log d to attain the polylog rate
+predicted by Thm. `errorbound_polylog`. Writes `polylog_error_1d.csv` and
+`polylog_error_2d.csv` consumed by `plot.ipynb`.
+Run from this folder: `python polylog_error.py`.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import multiprocessing as mp

@@ -1,3 +1,10 @@
+"""Fig. 5(b) — Width scaling for the improved neural scaling law (Sec. 5).
+
+Slurm array over `(d, seed)`; writes per-run CSVs into
+`CPU_harm_AdamW_k6_trains20000_noise0.2_bs128_lr0.001_epoch2000/` (consumed by `plot.ipynb`).
+Run from this folder under a Slurm array, or hard-code `sid` for a single-seed preview.
+"""
+
 import numpy as np
 import random
 import torch
